@@ -7,57 +7,85 @@ struct LinearModel <: AbstractModel
 end
 LinearModel() = LinearModel(0)
 
-struct QuadraticModel <: AbstractModel
+@with_kw struct QuadraticModel <: AbstractModel
+    w
+    updater = RLSUpdater(Matrix{Float64}(I,length(w),length(w)), 1.0)
+    ϕ = similar(w)
 end
 
+# QuadraticModel(w, updater=RLSUpdater(Matrix{Float64}(I,length(w),length(w)), 1.0), ϕ=similar(w)) = QuadraticModel(w=w, updater=updater, ϕ=ϕ)
 
-
-function Grid(ndims)
-    g = LeafNode()
-    for d = 1:ndims
-        g = breadthfirst(g) do g
-            split(g, d, 0.)
-        end
+function feature!(m::QuadraticModel, x, u)
+    ϕ = m.ϕ
+    i = 1
+    lf = length(x)
+    ϕ[i:lf] .= x
+    i += lf
+    ϕ[i:i+lf-1] .= x.^2
+    i += lf
+    lf = length(u)
+    ϕ[i:i+lf-1] .= u
+    i += lf
+    ϕ[i:i+lf-1] .= u.^2
+    i += lf
+    for j = 1:length(x), k = 1:length(u)
+        ϕ[i] = x[j]*u[k]
+        i += 1
     end
-    walk_up(g)
+    ϕ[i] = 1
+    ϕ
 end
 
-active_node(g::GridNode, x) = x > g.split ? g.right : g.left
-
-function find_split(g::GridNode)
+function update!(m::QuadraticModel, x, u, y)
+    feature!(m, x, u)
+    update!(m.updater, m.w, m.ϕ, y)
 end
 
-function split(g, dim, split)
-    @assert isleaf(g) "Can only split leaf nodes"
-    node         = GridNode()
-    if g.parent === nothing
-        parent = node
-    else
-        parent = g.parent
-        node.parent  = parent
-        if parent.left === g
-            parent.left = node
-        else
-            parent.right = node
-        end
-    end
-    parent.dim   = dim
-    parent.split = split
-    g
+function predict(m::QuadraticModel, x, u)
+    feature!(m, x, u)
+    m.ϕ'm.w
 end
 
-function update!(g::GridNode, x, y)
-    active = active_node(g,x)
-    update!(active.model, x, y)
+abstract type AbstractUpdater end
+
+struct RLSUpdater <: AbstractUpdater
+    P
+    λ
+end
+
+function update!(m::RLSUpdater, w, ϕ, y)
+    P,λ = m.P, m.λ
+    ϕᵀP = ϕ'*P
+    P .-= (P*ϕ*ϕᵀP)/(λ + ϕᵀP*ϕ)
+    e = y - ϕ'w
+    w .+= P*ϕ .* e
 end
 
 function update!(m::AbstractModel, x, y)
     m.x += 1
 end
 
+
+nx,nu = 2,1
+np = 2nx+2nu+nx*nu+1
+w = zeros(np)
+λ = 1
+updater = RLSUpdater(Matrix{Float64}(I,np,np), λ)
 ##
-grid = Grid(1)
-for i = 1:100
-    x = randn()
-    y = 2x + 0.1randn()
-    update!(grid,x,y)
+model = QuadraticModel(w,updater)
+grid = Grid(nx+nu, model)
+for i = 1:1000
+    if i % 10 == 0
+        g = find_split(grid)
+        split(g, rand(1:nx+nu), randn())
+    end
+    @show i
+    x = randn(nx)
+    u = randn(nu)
+    y = 2sum(x.*u) + 0.1randn()
+    yh = predict(grid, x, u)
+    @show y-yh
+    update!(grid,x,u,y)
+    yh = predict(grid, x, u)
+    @show y-yh
+end
