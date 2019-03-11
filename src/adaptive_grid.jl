@@ -66,26 +66,38 @@ function update!(m::AbstractModel, x, y)
 end
 
 
-nx,nu = 2,1
+##
+nx,nu = 1,1
 np = 2nx+2nu+nx*nu+1
 w = zeros(np)
 λ = 1
-updater = RLSUpdater(Matrix{Float64}(I,np,np), λ)
-##
-model = QuadraticModel(w,updater)
-grid = Grid(nx+nu, model)
-for i = 1:1000
-    if i % 10 == 0
-        g = find_split(grid)
-        split(g, rand(1:nx+nu), randn())
+domain = [(-1.,1.),(-1.,1.)]#,(-1.,1.)]
+updater = RLSUpdater(Matrix{Float64}(100I,np,np), λ)
+model = QuadraticModel(w=w,updater=updater)
+grid = Grid(domain, model)
+# splitter = TraceSplitter()
+splitter = NormalizedTraceSplitter()
+X,U,Y = [],[],[]
+f(x,u) = sin(3sum(x)) + sin(3sum(u))
+for i = 1:10000
+    if i % 100 == 0
+        splitter(grid)
+        @show countnodes(grid)
     end
     @show i
-    x = randn(nx)
-    u = randn(nu)
-    y = 2sum(x.*u) + 0.1randn()
+    x = 2 .*rand(nx) .-1
+    u = 2 .*rand(nu) .-1
+    y = f(x,u) + 0.1*(sum(x)+sum(u))*randn()
+    push!(X,x[])
+    push!(U,u[])
+    push!(Y,y[])
     yh = predict(grid, x, u)
     @show y-yh
     update!(grid,x,u,y)
     yh = predict(grid, x, u)
     @show y-yh
 end
+plot_tree(grid)
+
+##
+surface(X,U,f.(X,U))
