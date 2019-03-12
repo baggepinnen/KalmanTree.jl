@@ -1,70 +1,12 @@
 include("tree_tools.jl")
+include("domain_tools.jl")
+include("models.jl")
 
-abstract type AbstractModel end
-
-struct LinearModel <: AbstractModel
-    x
-end
-LinearModel() = LinearModel(0)
-
-@with_kw struct QuadraticModel <: AbstractModel
-    w
-    updater = RLSUpdater(Matrix{Float64}(I,length(w),length(w)), 1.0)
-    ϕ = similar(w)
-end
-
-# QuadraticModel(w, updater=RLSUpdater(Matrix{Float64}(I,length(w),length(w)), 1.0), ϕ=similar(w)) = QuadraticModel(w=w, updater=updater, ϕ=ϕ)
-
-function feature!(m::QuadraticModel, x, u)
-    ϕ = m.ϕ
-    i = 1
-    lf = length(x)
-    ϕ[i:lf] .= x
-    i += lf
-    ϕ[i:i+lf-1] .= x.^2
-    i += lf
-    lf = length(u)
-    ϕ[i:i+lf-1] .= u
-    i += lf
-    ϕ[i:i+lf-1] .= u.^2
-    i += lf
-    for j = 1:length(x), k = 1:length(u)
-        ϕ[i] = x[j]*u[k]
-        i += 1
-    end
-    ϕ[i] = 1
-    ϕ
-end
-
-function update!(m::QuadraticModel, x, u, y)
-    feature!(m, x, u)
-    update!(m.updater, m.w, m.ϕ, y)
-end
-
-function predict(m::QuadraticModel, x, u)
-    feature!(m, x, u)
-    m.ϕ'm.w
-end
-
-abstract type AbstractUpdater end
-
-struct RLSUpdater <: AbstractUpdater
-    P
-    λ
-end
-
-function update!(m::RLSUpdater, w, ϕ, y)
-    P,λ = m.P, m.λ
-    ϕᵀP = ϕ'*P
-    P .-= (P*ϕ*ϕᵀP)/(λ + ϕᵀP*ϕ)
-    e = y - ϕ'w
-    w .+= P*ϕ .* e
-end
-
-function update!(m::AbstractModel, x, y)
-    m.x += 1
-end
-
+#= Notes:
+Should splitting along action dimensions be allowed? Then how does one find argmaxₐ(Q)? since this max can be outside the domain of the model.
+If splts along action dimensions are kept at the bottom of the tree, one could operate on a subtree when finding argmaxₐ(Q). Each argmax is a box-constrained QP where the domain in a-dimensions determine the bounds. With this strategy, argmaxₐ must be carried out as many times as there are leaves in the subtree corresponding to the s-coordinate.
+First, the unconstraind argmax can be calculated for each cell. If the highest is inside its bounds, no box-constrained QP has to be solved
+=#
 
 ##
 nx,nu = 1,1
@@ -73,10 +15,11 @@ w = zeros(np)
 λ = 1
 domain = [(-1.,1.),(-1.,1.)]#,(-1.,1.)]
 updater = RLSUpdater(Matrix{Float64}(100I,np,np), λ)
-model = QuadraticModel(w=w,updater=updater)
+model = QuadraticModel(nx+nu,updater)
 grid = Grid(domain, model)
-# splitter = TraceSplitter()
-splitter = NormalizedTraceSplitter()
+# splitter = TraceSplitter(1:1)
+# splitter = NormalizedTraceSplitter(1:1)
+splitter = QuadformSplitter(1:1)
 X,U,Y = [],[],[]
 f(x,u) = sin(3sum(x)) + sin(3sum(u))
 for i = 1:10000
@@ -100,4 +43,4 @@ end
 plot_tree(grid)
 
 ##
-surface(X,U,f.(X,U))
+# surface(X,U,f.(X,U))

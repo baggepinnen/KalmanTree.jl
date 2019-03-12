@@ -124,76 +124,6 @@ function active_node(g::GridNode, x, u)
     xu_val(g,x,u) > g.split ? g.right : g.left
 end
 
-volume(g::AbstractNode) = volume(g.domain)
-function volume(d::AbstractVector)
-    width(d) = d[2]-d[1]
-    prod(width(d) for d in d)
-end
-
-abstract type AbstractSplitter end
-
-function find_split(g::GridNode, splitter::AbstractSplitter)
-    maxscore = -Inf
-    maxleaf = g
-    breadthfirst(g) do g
-        s = score(g, splitter)
-        if s > maxscore
-            maxscore = s
-            maxleaf = g
-        end
-    end
-    maxleaf
-end
-
-struct TraceSplitter <: AbstractSplitter end
-struct NormalizedTraceSplitter <: AbstractSplitter end
-
-score(node, splitter::TraceSplitter) = node.model.updater.P |> tr
-
-score(node, splitter::NormalizedTraceSplitter) = (node.model.updater.P |> tr)* volume(node)
-
-function Base.split(node::AbstractNode, splitter::AbstractSplitter)
-    dim = findmax(collect(d[2]-d[1] for d in node.domain))[2]
-    split(node, dim)
-    node
-end
-
-function (splitter::TraceSplitter)(g)
-    g = find_split(g, splitter)
-    split(g, splitter)
-end
-function (splitter::NormalizedTraceSplitter)(g)
-    g = find_split(g, splitter)
-    split(g, splitter)
-end
-function Base.split(g::AbstractNode, dim::Integer, split = :half)
-    @assert isleaf(g) "Can only split leaf nodes"
-    g.domain
-    if split == :half
-        split = (g.domain[dim][1]+g.domain[dim][2])/2
-    end
-    model = g.model
-    node  = GridNode(parent = g.parent, domain=g.domain, dim=dim, split=split)
-    if g.parent === nothing
-        parent = node
-    else
-        parent = g.parent
-        node.parent  = parent
-        if parent.left === g
-            parent.left = node
-        else
-            parent.right = node
-        end
-    end
-    ldomain = copy(node.domain)
-    rdomain = copy(node.domain)
-    ldomain[dim] = (ldomain[dim][1], split)
-    rdomain[dim] = (split, rdomain[dim][2])
-    node.left = LeafNode(node, g.model, ldomain)
-    node.right = LeafNode(node, deepcopy(g.model), rdomain)
-    node
-end
-
 function update!(g::GridNode, x, u, y)
     active = walk_down(g,x,u)
     update!(active.model, x, u, y)
@@ -204,6 +134,16 @@ function predict(g::GridNode, x, u)
     predict(active.model, x, u)
 end
 
+function update!(g::GridNode, x, y)
+    active = walk_down(g,x)
+    update!(active.model, x, y)
+end
+
+function predict(g::GridNode, x)
+    active = walk_down(g,x)
+    predict(active.model, x)
+end
+
 
 AbstractTrees.children(g::AbstractNode) = (g.left, g.right)
 AbstractTrees.children(g::LeafNode) = ()
@@ -211,10 +151,8 @@ AbstractTrees.printnode(io::IO,g::AbstractNode) = print(io,"Node, split: dim: $(
 AbstractTrees.printnode(io::IO,g::LeafNode) = print(io,"Leaf, domain: $(g.domain)")
 
 
-
 function plot_tree(g)
     p = plot()
-    # rect(d) = plot!([d[1][1],d[1][1],d[1][2],d[1][2],d[1][1]], [d[2][1],d[2][2],d[2][2],d[2][1],d[2][1]], l=(:black,))#, fill=:orage)
     rect(d) = Shape([d[1][1],d[1][1],d[1][2],d[1][2],d[1][1]],  [d[2][1],d[2][2],d[2][2],d[2][1],d[2][1]])
     covs = [tr(l.model.updater.P) for l in Leaves(g)]
     mc = maximum(covs)
@@ -224,5 +162,6 @@ function plot_tree(g)
         c = tr(l.model.updater.P)
         plot!(rect(l.domain), color=cg[c/mc])
     end
+    plot!(colorbar=true)
     p
 end
