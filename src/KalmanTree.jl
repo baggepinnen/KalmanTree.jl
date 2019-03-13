@@ -17,13 +17,14 @@ domain = [(-1.,1.),(-1.,1.)]#,(-1.,1.)]
 updater = RLSUpdater(Matrix{Float64}(100I,np,np), λ)
 model = QuadraticModel(nx+nu,updater)
 grid = Grid(domain, model)
-# splitter = TraceSplitter(1:1)
-# splitter = NormalizedTraceSplitter(1:1)
-splitter = QuadformSplitter(1:1)
+# splitter = TraceSplitter(1:2)
+# splitter = NormalizedTraceSplitter(1:2)
+# splitter = QuadformSplitter(1:2)
+splitter = RandomSplitter(1:2)
 X,U,Y = [],[],[]
 f(x,u) = sin(3sum(x)) + sin(3sum(u))
 for i = 1:10000
-    if i % 100 == 0
+    if i % 1000 == 0
         splitter(grid)
         @show countnodes(grid)
     end
@@ -40,7 +41,14 @@ for i = 1:10000
     yh = predict(grid, x, u)
     @show y-yh
 end
-plot_tree(grid)
+plot(grid, :value)
 
 ##
-# surface(X,U,f.(X,U))
+# plotly()
+# gr()
+po = (zlims=(-1.5,1.5), clims=(-2,2))
+xu = LinRange(-1,1,30),LinRange(-1,1,30)
+surface(xu..., f; title="True fun", layout=4, po...)
+surface!(xu..., (x,u)->predict(grid,x,u); title="Approximation", subplot=2, po...)
+surface!(xu..., (x,u)->predict(grid,x,u)-f(x,u); title="Error", subplot=3, po...)
+plot!(grid, :value, title="Grid cells", subplot=4)

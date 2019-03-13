@@ -55,8 +55,8 @@ function update!(m::QuadraticModel, x, u, y)
     update!(m.updater, m.w, m.ϕ, y)
 end
 
-function predict(m::QuadraticModel, x, u)
-    feature!(m, x, u)
+function predict(m::QuadraticModel, args...)
+    feature!(m, args...)
     m.ϕ'm.w
 end
 

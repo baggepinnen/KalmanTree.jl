@@ -23,6 +23,9 @@ end
 struct QuadformSplitter <: AbstractSplitter
     allowed_dims
 end
+struct RandomSplitter <: AbstractSplitter
+    allowed_dims
+end
 
 function (splitter::TraceSplitter)(g)
     g = find_split(g, splitter)
@@ -38,6 +41,11 @@ function (splitter::QuadformSplitter)(g)
     split(g, splitter)
 end
 
+function (splitter::RandomSplitter)(g)
+    g = find_split(g, splitter)
+    split(g, splitter)
+end
+
 score(node, splitter::TraceSplitter) = node.model.updater.P |> tr
 score(node, splitter::NormalizedTraceSplitter) = (node.model.updater.P |> tr)* volume(node)
 function score(node, splitter::QuadformSplitter)
@@ -46,7 +54,7 @@ function score(node, splitter::QuadformSplitter)
     x'*(node.model.updater.P\x) # TODO: not sure about inverse
 end
 
-function find_split(g::GridNode, splitter::AbstractSplitter)
+function find_split(g::AbstractNode, splitter::AbstractSplitter)
     maxscore = -Inf
     maxleaf = g
     breadthfirst(g) do g
@@ -59,11 +67,22 @@ function find_split(g::GridNode, splitter::AbstractSplitter)
     maxleaf
 end
 
+
+function find_split(g::AbstractNode, splitter::RandomSplitter)
+    c = countnodes(g)
+    n = rand(1:c)
+    for (i,l) in enumerate(Leaves(g))
+        if i == n
+            return l
+        end
+    end
+end
+
 "split(node::AbstractNode, splitter::AbstractSplitter)
 Split node with highest score."
 function Base.split(node::AbstractNode, splitter::AbstractSplitter)
-    # dim = findmax(collect(d[2]-d[1] for d in node.domain[splitter.allowed_dims]))[2]
-    dim = findmax(collect(d[2]-d[1] for d in node.domain))[2]
+    dim = findmax(collect(d[2]-d[1] for d in node.domain[splitter.allowed_dims]))[2]
+    # dim = findmax(collect(d[2]-d[1] for d in node.domain))[2]
     split(node, dim)
     node
 end

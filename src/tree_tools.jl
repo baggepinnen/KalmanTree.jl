@@ -117,29 +117,29 @@ function xu_val(g,x,u,dim=g.dim)
     end
 end
 
-function active_node(g::GridNode, x)
+function active_node(g::AbstractNode, x)
     x[g.dim] > g.split ? g.right : g.left
 end
-function active_node(g::GridNode, x, u)
+function active_node(g::AbstractNode, x, u)
     xu_val(g,x,u) > g.split ? g.right : g.left
 end
 
-function update!(g::GridNode, x, u, y)
+function update!(g::AbstractNode, x, u, y)
     active = walk_down(g,x,u)
     update!(active.model, x, u, y)
 end
 
-function predict(g::GridNode, x, u)
+function predict(g::AbstractNode, x, u)
     active = walk_down(g,x,u)
     predict(active.model, x, u)
 end
 
-function update!(g::GridNode, x, y)
+function update!(g::AbstractNode, x, y)
     active = walk_down(g,x)
     update!(active.model, x, y)
 end
 
-function predict(g::GridNode, x)
+function predict(g::AbstractNode, x)
     active = walk_down(g,x)
     predict(active.model, x)
 end
@@ -151,17 +151,24 @@ AbstractTrees.printnode(io::IO,g::AbstractNode) = print(io,"Node, split: dim: $(
 AbstractTrees.printnode(io::IO,g::LeafNode) = print(io,"Leaf, domain: $(g.domain)")
 
 
-function plot_tree(g)
-    p = plot()
+@recipe function plot_tree(g::AbstractNode, indicate = :cov)
     rect(d) = Shape([d[1][1],d[1][1],d[1][2],d[1][2],d[1][1]],  [d[2][1],d[2][2],d[2][2],d[2][1],d[2][1]])
     covs = [tr(l.model.updater.P) for l in Leaves(g)]
     mc = maximum(covs)
-
+    colorbar := true
+    label := ""
+    legend := false
     cg = cgrad(:inferno)
     for l in Leaves(g)
-        c = tr(l.model.updater.P)
-        plot!(rect(l.domain), color=cg[c/mc])
+        if indicate == :cov
+            c = tr(l.model.updater.P)/mc
+        else
+            c = (predict(l, centroid(l))+2)/4
+        end
+        @series begin
+            color := cg[c]
+            rect(l.domain)
+        end
     end
-    plot!(colorbar=true)
-    p
+    nothing
 end
