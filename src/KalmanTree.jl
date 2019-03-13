@@ -53,8 +53,9 @@ surface!(xu..., (x,u)->predict(grid,x,u); title="Approximation", subplot=2, po..
 surface!(xu..., (x,u)->predict(grid,x,u)-f(x,u); title="Error", subplot=3, po...)
 plot!(grid, :value, title="Grid cells", subplot=4)
 
+##
 x,u = X[1],U[1]
 n = walk_down(grid,x,u)
 um = argmax_u(n.model, x)
-plot(u->predict(n.model, x, u))
+plot(u->predict(n.model, x, u), title="Q(a)", legend=false)
 vline!(um)

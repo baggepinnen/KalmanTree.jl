@@ -31,7 +31,7 @@ QuadraticModel(n::Int) = (n+=1;QuadraticModel(w = zeros(n*(n+1)÷2)))
 QuadraticModel(n::Int,u::AbstractUpdater, actiondims) = (n+=1;QuadraticModel(w = zeros(n*(n+1)÷2),updater=u, actiondims=actiondims))
 
 function feature!(m::QuadraticModel, x, u)
-    feature!(m::QuadraticModel, [x;u])
+    feature!(m::QuadraticModel, [u;x])
 end
 
 function feature!(m::QuadraticModel, x)
@@ -65,42 +65,27 @@ end
 
 function argmax_u(m::QuadraticModel, x)
     # TODO: move actions to beginning to improve cache locality, store Q in m to avoid allocating new
-    nu  = length(m.actiondims)
-    nx  = length(x)
-    np  = nx+nu+1
-    Q = zeros(np,np)
-    k = 0
+    nu = length(m.actiondims)
+    nx = length(x)
+    np = nx+nu+1
+    Q  = zeros(np,np)
+    k  = 0
     for i = 1:np, j = i:np
          Q[i,j] = Q[j,i] = model.w[k+=1]
     end
-    Qux = Q[nx+1:nx+nu, 1:nx]
-    Quu = Q[nx+1:nx+nu, nx+1:nx+nu]
-    qu  = Q[nx+1:nx+nu, nx+nu+1]
+    uinds = 1:nu
+    Qux   = Q[uinds, nu+1:nu+nx]
+    Quu   = Q[uinds, uinds]
+    qu    = Q[uinds, nu+nx+1]
     if isposdef(Quu)
         # TODO: check in domain
-        return -(Quu\(Qux*x[1:nx] + qu)) ./2
+        # TODO: solve QP if this solution is not feasible
+        return -(Quu\(Qux*x + qu)) ./2
     else
         return Inf
     end
 end
 
-function argmax_u(m::QuadraticModel, x::Number)
-    nu  = length(m.actiondims)
-    nx  = 1
-    np  = nx+nu+1
-    Q = zeros(np,np)
-    k = 0
-    for i = 1:np, j = i:np
-         Q[i,j] = Q[j,i] = model.w[k+=1]
-    end
-    Qux = Q[nx+1:nx+nu, 1:nx]
-    Quu = Q[nx+1:nx+nu, nx+1:nx+nu]
-    qu  = Q[nx+1:nx+nu, nx+nu+1]
-    if isposdef(Quu)
-        return -(Quu\(Qux*x + qu)) ./2
-    else
-    end
-end
 
 # Q = [Qxx Qxu qx;
 #      Qxu' Quu qu;

@@ -2,10 +2,10 @@ using Parameters, AbstractTrees
 abstract type AbstractNode end
 
 @with_kw mutable struct RootNode <: AbstractNode
-    left = LeafNode()
-    right = LeafNode()
-    dim = 0
-    split = 0.0
+    left   = LeafNode()
+    right  = LeafNode()
+    dim    = 0
+    split  = 0.0
     domain = [(-1.,1.)]
 end
 function RootNode(domain)
@@ -17,15 +17,15 @@ end
 
 @with_kw mutable struct GridNode <: AbstractNode
     parent = nothing
-    left = nothing
-    right = nothing
-    dim = 0
-    split = 0.0
+    left   = nothing
+    right  = nothing
+    dim    = 0
+    split  = 0.0
     domain = [(-1.,1.)]
 end
 function GridNode(p=nothing)
     g = GridNode(parent=p,left=LeafNode(),right=LeafNode(),dim=0,split=0.0)
-    g.left.parent = g
+    g.left.parent  = g
     g.right.parent = g
     g
 end
@@ -110,10 +110,10 @@ function Grid(domain::AbstractVector{<:Tuple}, model)
 end
 
 function xu_val(g,x,u,dim=g.dim)
-    if dim > length(x)
-        return u[dim - length(x)]
+    if dim > length(u)
+        return x[dim - length(u)]
     else
-        return x[dim]
+        return u[dim]
     end
 end
 
@@ -124,14 +124,14 @@ function active_node(g::AbstractNode, x, u)
     xu_val(g,x,u) > g.split ? g.right : g.left
 end
 
+function predict(g::AbstractNode, args...)
+    active = walk_down(g,args...)
+    predict(active.model, args...)
+end
+
 function update!(g::AbstractNode, x, u, y)
     active = walk_down(g,x,u)
     update!(active.model, x, u, y)
-end
-
-function predict(g::AbstractNode, x, u)
-    active = walk_down(g,x,u)
-    predict(active.model, x, u)
 end
 
 function update!(g::AbstractNode, x, y)
@@ -139,10 +139,6 @@ function update!(g::AbstractNode, x, y)
     update!(active.model, x, y)
 end
 
-function predict(g::AbstractNode, x)
-    active = walk_down(g,x)
-    predict(active.model, x)
-end
 
 
 AbstractTrees.children(g::AbstractNode) = (g.left, g.right)
