@@ -24,12 +24,11 @@ LinearModel() = LinearModel(0)
     w
     updater = RLSUpdater(Matrix{Float64}(I,length(w),length(w)), 1.0)
     ϕ = similar(w)
+    actiondims = 1:length(w)
 end
 
 QuadraticModel(n::Int) = (n+=1;QuadraticModel(w = zeros(n*(n+1)÷2)))
-QuadraticModel(n::Int,u::AbstractUpdater) = (n+=1;QuadraticModel(w = zeros(n*(n+1)÷2),updater=u))
-
-# QuadraticModel(w, updater=RLSUpdater(Matrix{Float64}(I,length(w),length(w)), 1.0), ϕ=similar(w)) = QuadraticModel(w=w, updater=updater, ϕ=ϕ)
+QuadraticModel(n::Int,u::AbstractUpdater, actiondims) = (n+=1;QuadraticModel(w = zeros(n*(n+1)÷2),updater=u, actiondims=actiondims))
 
 function feature!(m::QuadraticModel, x, u)
     feature!(m::QuadraticModel, [x;u])
@@ -60,7 +59,50 @@ function predict(m::QuadraticModel, args...)
     m.ϕ'm.w
 end
 
-
 function update!(m::AbstractModel, x, y)
     m.x += 1
 end
+
+function argmax_u(m::QuadraticModel, x)
+    # TODO: move actions to beginning to improve cache locality, store Q in m to avoid allocating new
+    nu  = length(m.actiondims)
+    nx  = length(x)
+    np  = nx+nu+1
+    Q = zeros(np,np)
+    k = 0
+    for i = 1:np, j = i:np
+         Q[i,j] = Q[j,i] = model.w[k+=1]
+    end
+    Qux = Q[nx+1:nx+nu, 1:nx]
+    Quu = Q[nx+1:nx+nu, nx+1:nx+nu]
+    qu  = Q[nx+1:nx+nu, nx+nu+1]
+    if isposdef(Quu)
+        # TODO: check in domain
+        return -(Quu\(Qux*x[1:nx] + qu)) ./2
+    else
+        return Inf
+    end
+end
+
+function argmax_u(m::QuadraticModel, x::Number)
+    nu  = length(m.actiondims)
+    nx  = 1
+    np  = nx+nu+1
+    Q = zeros(np,np)
+    k = 0
+    for i = 1:np, j = i:np
+         Q[i,j] = Q[j,i] = model.w[k+=1]
+    end
+    Qux = Q[nx+1:nx+nu, 1:nx]
+    Quu = Q[nx+1:nx+nu, nx+1:nx+nu]
+    qu  = Q[nx+1:nx+nu, nx+nu+1]
+    if isposdef(Quu)
+        return -(Quu\(Qux*x + qu)) ./2
+    else
+    end
+end
+
+# Q = [Qxx Qxu qx;
+#      Qxu' Quu qu;
+#      qx'  qu' q]
+# X = [x;u;1]

@@ -15,7 +15,7 @@ w = zeros(np)
 λ = 1
 domain = [(-1.,1.),(-1.,1.)]#,(-1.,1.)]
 updater = RLSUpdater(Matrix{Float64}(100I,np,np), λ)
-model = QuadraticModel(nx+nu,updater)
+model = QuadraticModel(nx+nu,updater,2)
 grid = Grid(domain, model)
 # splitter = TraceSplitter(1:2)
 # splitter = NormalizedTraceSplitter(1:2)
@@ -52,3 +52,9 @@ surface(xu..., f; title="True fun", layout=4, po...)
 surface!(xu..., (x,u)->predict(grid,x,u); title="Approximation", subplot=2, po...)
 surface!(xu..., (x,u)->predict(grid,x,u)-f(x,u); title="Error", subplot=3, po...)
 plot!(grid, :value, title="Grid cells", subplot=4)
+
+x,u = X[1],U[1]
+n = walk_down(grid,x,u)
+um = argmax_u(n.model, x)
+plot(u->predict(n.model, x, u))
+vline!(um)
