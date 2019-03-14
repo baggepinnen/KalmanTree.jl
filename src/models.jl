@@ -63,26 +63,29 @@ function update!(m::AbstractModel, x, y)
     m.x += 1
 end
 
-function argmax_u(m::QuadraticModel, x)
+function argmax_u(m::QuadraticModel, x::Float64)
     # TODO: move actions to beginning to improve cache locality, store Q in m to avoid allocating new
     nu = length(m.actiondims)
     nx = length(x)
     np = nx+nu+1
     Q  = zeros(np,np)
     k  = 0
-    for i = 1:np, j = i:np
-         Q[i,j] = Q[j,i] = model.w[k+=1]
+    for i = 1:np
+        for j = i:np
+            Q[i,j] = Q[j,i] = m.w[k+=1]
+        end
     end
     uinds = 1:nu
     Qux   = Q[uinds, nu+1:nu+nx]
     Quu   = Q[uinds, uinds]
     qu    = Q[uinds, nu+nx+1]
-    if isposdef(Quu)
+    as = vec(-(Quu\(Qux*x + qu)) ./2)
+    if !isposdef(Quu)
         # TODO: check in domain
-        # TODO: solve QP if this solution is not feasible
-        return -(Quu\(Qux*x + qu)) ./2
+        return as
     else
-        return Inf
+        res = boxQP(Quu,-vec(Qux*x + qu), [-1.],[1.], 0as)
+        return vec(res[1])
     end
 end
 

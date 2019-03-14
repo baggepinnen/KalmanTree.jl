@@ -24,7 +24,7 @@ splitter = RandomSplitter(1:2)
 X,U,Y = [],[],[]
 f(x,u) = sin(3sum(x)) + sin(3sum(u))
 for i = 1:10000
-    if i % 1000 == 0
+    if i % 100 == 0
         splitter(grid)
         @show countnodes(grid)
     end
@@ -54,8 +54,10 @@ surface!(xu..., (x,u)->predict(grid,x,u)-f(x,u); title="Error", subplot=3, po...
 plot!(grid, :value, title="Grid cells", subplot=4)
 
 ##
-x,u = X[1],U[1]
+
+x,u = X[rand(1:length(X))],U[rand(1:length(X))]
 n = walk_down(grid,x,u)
+n.domain
 um = argmax_u(n.model, x)
-plot(u->predict(n.model, x, u), title="Q(a)", legend=false)
+plot(u->predict(n.model, x, u), -2,2, title="Q(a)", legend=false)
 vline!(um)
