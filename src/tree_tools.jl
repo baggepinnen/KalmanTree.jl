@@ -98,15 +98,15 @@ function countnodes(root)
     counter
 end
 
-function Grid(domain::AbstractVector{<:Tuple}, model)
+function Grid(domain::AbstractVector{<:Tuple}, model, splitter)
     ndims = length(domain)
-    g = split(LeafNode(model=model, domain=domain), 1)
-    for d = 2:ndims
-        depthfirst(g) do c
+    seed = split(LeafNode(model=model, domain=domain), splitter.allowed_dims[1])
+    for d = splitter.allowed_dims[2:end]
+        depthfirst(seed) do c
             split(c, d)
         end
     end
-    g
+    seed
 end
 
 function xu_val(g,x,u,dim=g.dim)

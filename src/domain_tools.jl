@@ -81,7 +81,11 @@ end
 "split(node::AbstractNode, splitter::AbstractSplitter)
 Split node with highest score."
 function Base.split(node::AbstractNode, splitter::AbstractSplitter)
-    dim = findmax(collect(d[2]-d[1] for d in node.domain[splitter.allowed_dims]))[2]
+    scores = Vector{Float64}(undef,length(node.domain))
+    for i in eachindex(scores)
+        scores[i] = i ∈ splitter.allowed_dims ? volume(node.domain[i]) : -Inf
+    end
+    dim = findmax(scores)[2]
     # dim = findmax(collect(d[2]-d[1] for d in node.domain))[2]
     split(node, dim)
     node
