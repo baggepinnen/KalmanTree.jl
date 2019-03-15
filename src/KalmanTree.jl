@@ -1,7 +1,7 @@
 include("tree_tools.jl")
 include("domain_tools.jl")
 include("models.jl")
-
+using Plots
 #= Notes:
 Should splitting along action dimensions be allowed? Then how does one find argmaxₐ(Q)? since this max can be outside the domain of the model.
 If splts along action dimensions are kept at the bottom of the tree, one could operate on a subtree when finding argmaxₐ(Q). Each argmax is a box-constrained QP where the domain in a-dimensions determine the bounds. With this strategy, argmaxₐ must be carried out as many times as there are leaves in the subtree corresponding to the s-coordinate.
@@ -18,7 +18,7 @@ grid = Grid(domain, model, splitter)
 # splitter = NormalizedTraceSplitter(1:2)
 # splitter = QuadformSplitter(1:2)
 X,U,Y = [],[],[]
-f(x,u) = sin(3sum(x)) + sin(3sum(u))
+f(x,u) = sin(3sum(x)) + sum(-(u-x).^2)
 for i = 1:10000
     if i % 100 == 0
         splitter(grid)
@@ -45,13 +45,13 @@ plot(grid, :value)
 po = (zlims=(-1.5,1.5), clims=(-2,2))
 xu = LinRange(-1,1,30),LinRange(-1,1,30)
 surface(xu..., f; title="True fun", layout=4, po...)
-surface!(xu..., (x,u)->predict(grid,x,u); title="Approximation", subplot=2, po...)
-surface!(xu..., (x,u)->predict(grid,x,u)-f(x,u); title="Error", subplot=3, po...)
+# surface!(xu..., (x,u)->predict(grid,x,u); title="Approximation", subplot=2, po...)
+# surface!(xu..., (x,u)->predict(grid,x,u)-f(x,u); title="Error", subplot=3, po...)
 plot!(grid, :value, title="Grid cells", subplot=4)
 
 ##
 
-x,u = X[rand(1:length(X))],U[rand(1:length(X))]
+x,u = (X[rand(1:length(X))],U[rand(1:length(X))])
 n = walk_down(grid,x,u)
 um = argmax_u(n, x)
 # plot(u->predict(n.model, x, u), -2,2, title="Q(a)", legend=false)

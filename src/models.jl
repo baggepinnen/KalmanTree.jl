@@ -1,4 +1,4 @@
-using DifferentialDynamicProgramming, PositiveFactorizations
+using DifferentialDynamicProgramming
 
 abstract type AbstractUpdater end
 struct RLSUpdater <: AbstractUpdater

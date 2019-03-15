@@ -1,4 +1,4 @@
-using Parameters, AbstractTrees
+using Parameters, AbstractTrees, RecipesBase, LinearAlgebra
 abstract type AbstractNode end
 
 @with_kw mutable struct RootNode <: AbstractNode
@@ -147,8 +147,8 @@ AbstractTrees.printnode(io::IO,g::AbstractNode) = print(io,"Node, split: dim: $(
 AbstractTrees.printnode(io::IO,g::LeafNode) = print(io,"Leaf, domain: $(g.domain)")
 
 
-@recipe function plot_tree(g::AbstractNode, indicate = :cov)
-    rect(d) = Shape([d[1][1],d[1][1],d[1][2],d[1][2],d[1][1]],  [d[2][1],d[2][2],d[2][2],d[2][1],d[2][1]])
+@recipe function plot_tree(g::AbstractNode, indicate = :cov; dims=1:2)
+    rect(d) = Shape([d[dims[1]][1],d[dims[1]][1],d[dims[1]][2],d[dims[1]][2],d[dims[1]][1]],  [d[dims[2]][1],d[dims[2]][2],d[dims[2]][2],d[dims[2]][1],d[dims[2]][1]])
     covs = [tr(l.model.updater.P) for l in Leaves(g)]
     mc = maximum(covs)
     colorbar := true
@@ -164,6 +164,39 @@ AbstractTrees.printnode(io::IO,g::LeafNode) = print(io,"Leaf, domain: $(g.domain
         @series begin
             color := cg[c]
             rect(l.domain)
+        end
+    end
+    nothing
+end
+
+@userplot Gridmat
+@recipe function gridmat(gm::Gridmat)
+    g = gm.args[1]
+    d = g.domain
+    dims = length(domain)
+    colorbar := false
+    label := ""
+    legend := false
+    cg = cgrad(:inferno)
+    layout := (dims,dims)
+    seriestype := :surface
+    indmat = LinearIndices((dims,dims))'
+    for d1 = 1:dims
+        for d2 = 1:dims
+            subplot := indmat[d1,d2]
+            for l in Leaves(g)
+                c = centroid(l)
+                @series begin
+                    x = LinRange(d[d1]...,20)
+                    y = LinRange(d[d2]...,20)
+                    pf = (x,y) -> begin
+                    c[d1] = x
+                    c[d2] = y
+                    predict(g, c)
+                    end
+                    x,y,pf
+                end
+            end
         end
     end
     nothing
