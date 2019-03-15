@@ -1,17 +1,34 @@
 using DifferentialDynamicProgramming
 
 abstract type AbstractUpdater end
-struct RLSUpdater <: AbstractUpdater
-    P
-    λ
+@with_kw struct RLSUpdater{TP,Tl} <: AbstractUpdater
+    P::TP
+    λ::Tl
 end
 
 function update!(m::RLSUpdater, w, ϕ, y)
     P,λ = m.P, m.λ
     ϕᵀP = ϕ'*P
-    P .-= (P*ϕ*ϕᵀP)/(λ + ϕᵀP*ϕ)
+    P .= (P .- (P*ϕ*ϕᵀP) ./(λ + ϕᵀP*ϕ))./λ
     e = y - ϕ'w
     w .+= P*ϕ .* e
+end
+
+@with_kw struct KalmanUpdater{TP,Tl} <: AbstractUpdater
+    P::TP
+    λ::Tl
+end
+
+function update!(m::KalmanUpdater, w, ϕ, y)
+    # TODO: this can be made more efficient
+    P,λ  = m.P, m.λ
+    ϕᵀP  = ϕ'*P
+    Pϕ   = P*ϕ
+    ϕᵀPϕ = ϕᵀP*ϕ
+    K    = Pϕ ./(1+ϕᵀPϕ)
+    P   .= P .- K*ϕᵀP + λ*I
+    e    = y - ϕ'w
+    w  .+= K .* e
 end
 
 abstract type AbstractModel end
@@ -23,7 +40,7 @@ LinearModel() = LinearModel(0)
 
 @with_kw struct QuadraticModel <: AbstractModel
     w
-    updater = RLSUpdater(Matrix{Float64}(I,length(w),length(w)), 1.0)
+    updater = KalmanUpdater(Matrix{Float64}(I,length(w),length(w)), 1.0)
     ϕ = similar(w)
     actiondims = 1:length(w)
     Q = w2Q(w)
@@ -32,7 +49,12 @@ end
 w2Q(w) = zeros(p2n(length(w)),p2n(length(w)))
 p2n(p) = Int((-1 + sqrt(1+8p))/2)
 
-QuadraticModel(n::Int;kwargs...) = (n+=1;QuadraticModel(;w = zeros(n*(n+1)÷2),kwargs...))
+function QuadraticModel(n::Int;λ=1.0,P0=1000,kwargs...)
+    n+=1
+    w = zeros(n*(n+1)÷2)
+    updater = KalmanUpdater(Matrix{Float64}(P0*I,length(w),length(w)), λ)
+    QuadraticModel(;w = w, updater=updater, kwargs...)
+end
 
 function feature!(m::QuadraticModel, x, u)
     feature!(m::QuadraticModel, [u;x])
@@ -70,6 +92,7 @@ end
 argmax_u(g::AbstractNode, x) = argmax_u(g.model, x, g.domain)
 
 function argmax_u(m::QuadraticModel, x, domain)
+    actiondomain = domain[m.actiondims]
     nu = length(m.actiondims)
     nx = length(x)
     np = nx+nu+1
@@ -86,35 +109,38 @@ function argmax_u(m::QuadraticModel, x, domain)
     qu    = Q[uinds, nu+nx+1]
     RHS = (Qux*x + qu)
     as = vec((Quu\(-RHS)) ./2) # Negated both Q and RHS to be able to check posdef
-
     posdef = isposdef(Quu)
-    if as ∈ domain && posdef
+    if as ∈ actiondomain && posdef
         return as
     elseif posdef # but argmax not in domain
-        actiondomain = domain[m.actiondims]
         lb = getindex.(actiondomain, 1)
         ub = getindex.(actiondomain, 2)
-        res = boxQP(Quu,vec(RHS), lb, ub, 0as)
-        return vec(res[1])
-    else # This is tricky
-        actiondomain = domain[m.actiondims]
-        return gradient_ascent(Quu, RHS, actiondomain)
-
+        u0 = centroid(actiondomain)
+        res = boxQP(Quu,RHS, lb, ub, u0;
+        minGrad = 1e-10,
+        maxIter=200)
+        if res[2] >= 6
+            return vec(res[1])
+        end
     end
+    # This is tricky
+    return gradient_ascent(Quu, RHS, actiondomain)
+
 end
 
+
 function gradient_ascent(Quu, RHS, domain)
-    @show u = centroid(domain) # start point
-    @show α = 1maximum(volume(d) for d in domain)
+    u = centroid(domain) # start point
+    α = 1maximum(volume(d) for d in domain)
     grad(u) = -α*(2Quu*u + RHS)
-    @show g = grad(u)
-    @show u .+= g # Take enormous gradient step
-    @show project!(u, domain)
+    g = grad(u)
+    u .+= g # Take enormous gradient step
+    project!(u, domain)
     for iter = 1:5
-        @show g = grad(u)
-        @show project!(u,domain,g)
-        @show u .+= grad(u)
-        @show project!(u, domain)
+        g = grad(u)
+        project!(u,domain,g)
+        u .+= grad(u)
+        project!(u, domain)
     end
     u
 end

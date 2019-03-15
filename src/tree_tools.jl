@@ -98,10 +98,12 @@ function countnodes(root)
     counter
 end
 
-function Grid(domain::AbstractVector{<:Tuple}, model, splitter)
-    ndims = length(domain)
-    seed = split(LeafNode(model=model, domain=domain), splitter.allowed_dims[1])
-    for d = splitter.allowed_dims[2:end]
+function Grid(domain::AbstractVector{<:Tuple}, model, splitter; initial_split=splitter.allowed_dims)
+    initial_split == 0 && (return LeafNode(model=model, domain=domain))
+    nsplits = length(initial_split)
+    seed = split(LeafNode(model=model, domain=domain), initial_split[1])
+    nsplits == 1 && (return seed)
+    for d = initial_split[2:end]
         depthfirst(seed) do c
             split(c, d)
         end
@@ -182,7 +184,7 @@ end
     seriestype := :surface
     indmat = LinearIndices((dims,dims))'
     for d1 = 1:dims
-        for d2 = 1:dims
+        for d2 = 1:d1
             subplot := indmat[d1,d2]
             for l in Leaves(g)
                 c = centroid(l)
