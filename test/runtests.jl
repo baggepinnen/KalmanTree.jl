@@ -1,5 +1,5 @@
 
-using Test
+using Test, LinearAlgebra, Random
 
 root = LeafNode()
 @test root.parent === nothing
@@ -54,3 +54,37 @@ grid = Grid(domain, nothing)
 @test grid.left.dim == 2
 @test grid.left.left.dim == 3
 @test grid.left.left.right.dim == 4
+
+# Models and updaters
+N = 200
+x = [randn(2) for i = 1:N]
+u = [randn(3) for i = 1:N]
+Q = randn(5,5)
+Q = (Q + Q')/2 + 5I
+@test isposdef(Q)
+q = randn(5)
+c = randn()
+fq(x,u) = fq([u;x])
+fq(x) = x'Q*x + q'x + c
+y = map(fq,x,u)
+
+m = QuadraticModel(5, actiondims=1:3)
+P0 = det(cov(m))
+update!(m,x[1],u[1],y[1])
+foreach(x,u,y) do x,u,y
+    update!(m,x,u,y)
+end
+
+@test all(zip(x,u,y)) do (x,u,y)
+    abs(y - predict(m,x,u)) < 0.0001
+end
+
+@test det(cov(m)) < P0
+@test cond(cov(m)) < 100
+Quu,Qux, qu = Qmats(m,x[1])
+
+@test isposdef(-Quu)
+@test sum(abs, -Quu \ Q[1:3,1:3] - I) < 5
+@test sum(abs, -qu - q[1:3]) < 1e-5
+@test sum(abs, -Qux - Q[1:3,4:5]) < 1e-5
+@test abs(m.w[end] - c) < 1e-5
