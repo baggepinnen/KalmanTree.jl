@@ -56,6 +56,10 @@ grid = Grid(domain, nothing)
 @test grid.left.left.right.dim == 4
 
 # Models and updaters
+include("/local/home/fredrikb/.julia/dev/KalmanTree/src/tree_tools.jl")
+include("/local/home/fredrikb/.julia/dev/KalmanTree/src/domain_tools.jl")
+include("/local/home/fredrikb/.julia/dev/KalmanTree/src/models.jl")
+using Test, LinearAlgebra, Random
 N = 200
 x = [randn(2) for i = 1:N]
 u = [randn(3) for i = 1:N]
@@ -88,3 +92,30 @@ Quu,Qux, qu = Qmats(m,x[1])
 @test sum(abs, -qu - q[1:3]) < 1e-5
 @test sum(abs, -Qux - Q[1:3,4:5]) < 1e-5
 @test abs(m.w[end] - c) < 1e-5
+
+
+
+
+updater = NewtonUpdater(0.5, 0.999)
+m = QuadraticModel(5, actiondims=1:3, updater = updater)
+for i = 1:5
+    foreach(x,u,y) do x,u,y
+        update!(m,x,u,y)
+    end
+end
+
+@test mean(zip(x,u,y)) do (x,u,y)
+    abs2(y - predict(m,x,u))
+end  < 1e-6
+
+updater = GradientUpdater(0.01, 0.999)
+m = QuadraticModel(5, actiondims=1:3, updater = updater)
+for i = 1:50
+    foreach(x,u,y) do x,u,y
+        update!(m,x,u,y)
+    end
+end
+
+@test mean(zip(x,u,y)) do (x,u,y)
+    abs2(y - predict(m,x,u))
+end  < 1e-6

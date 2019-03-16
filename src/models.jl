@@ -40,11 +40,6 @@ end
 
 abstract type AbstractModel end
 
-struct LinearModel <: AbstractModel
-    x
-end
-LinearModel() = LinearModel(0)
-
 @with_kw struct QuadraticModel <: AbstractModel
     w
     updater = KalmanUpdater(P=Matrix{Float64}(I,length(w),length(w)), λ=1.0)
@@ -94,7 +89,6 @@ function predict(m::QuadraticModel, args...)
     feature!(m, args...)
     m.ϕ'm.w
 end
-
 
 argmax_u(g::AbstractNode, x) = argmax_u(g.model, x, g.domain)
 
@@ -172,6 +166,41 @@ function project!(u, domain, g)
         end
     end
     g
+end
+
+struct NewtonUpdater <: AbstractUpdater
+    α::Float64
+    σ2::OnlineStats.Variance{Float64,ExponentialWeight}
+    NewtonUpdater(α, λ::Number) = new(α, Variance(;weight=ExponentialWeight(λ)))
+end
+
+function update!(m::NewtonUpdater, w, ϕ, y)
+    n,e = newton(m, w, ϕ, y)
+    fit!(m.σ2, e)
+    w .-= m.α*n
+end
+
+function newton(m::QuadraticModel, x, u, y)
+    ϕ = feature!(m,x,u)
+    newton(m.updater, ϕ, y)
+end
+
+function newton(m::NewtonUpdater, w, ϕ, y)
+    e = (y - ϕ'w)
+    (ϕ*ϕ' + 1e-8I)\(ϕ.*(-e)), e
+    # -(ϕ.*e), e
+end
+
+struct GradientUpdater <: AbstractUpdater
+    α::Float64
+    σ2::OnlineStats.Variance{Float64,ExponentialWeight}
+    GradientUpdater(α, λ::Number) = new(α, Variance(;weight=ExponentialWeight(λ)))
+end
+
+function update!(m::GradientUpdater, w, ϕ, y)
+    e = (y - ϕ'w)
+    fit!(m.σ2, e)
+    w .+= ϕ .* (m.α*e)
 end
 
 Base.:∈(x::AbstractArray, dom::Vector{<:Tuple}) = all(x ∈ d for (x,d) in zip(x,dom))
