@@ -1,7 +1,3 @@
-using DifferentialDynamicProgramming
-using PositiveFactorizations
-using OnlineStats
-
 abstract type AbstractUpdater end
 @with_kw struct RLSUpdater{TP,Tl} <: AbstractUpdater
     P::TP
@@ -60,8 +56,8 @@ end
 
 function feature!(m::QuadraticModel, x, u)
     ux = @view m.Q[1:length(x)+length(u),1]
-    ux[1:length(x)] .= x
-    ux[length(x)+1:end] .= u
+    ux[1:length(u)] .= u
+    ux[length(u)+1:end] .= x
     feature!(m::QuadraticModel, ux)
 end
 

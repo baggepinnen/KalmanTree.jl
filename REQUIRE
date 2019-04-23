@@ -2,3 +2,5 @@ julia 1.0
 Parameters
 RecipesBase
 AbstractTrees
+DifferentialDynamicProgramming
+OnlineStats

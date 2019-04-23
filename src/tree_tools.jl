@@ -1,4 +1,4 @@
-using Parameters, AbstractTrees, RecipesBase, LinearAlgebra
+
 abstract type AbstractNode end
 
 @with_kw mutable struct RootNode <: AbstractNode
@@ -44,14 +44,9 @@ isroot(g::LeafNode) = false
 isroot(g::GridNode) = false
 isroot(g::RootNode) = true
 
-function walk_down(g, x)
+function walk_down(g, args...)
     isleaf(g) && (return g) # Reached the end
-    walk_down(active_node(g, x), x)
-end
-
-function walk_down(g, x, u)
-    isleaf(g) && (return g) # Reached the end
-    walk_down(active_node(g, x, u), x, u)
+    walk_down(active_node(g, args...), args...)
 end
 
 walk_up(g::RootNode, d) = g,0
