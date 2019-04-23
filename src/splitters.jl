@@ -1,5 +1,6 @@
 
 abstract type AbstractSplitter end
+abstract type AbstractWrapper <: AbstractSplitter end
 struct TraceSplitter <: AbstractSplitter
     allowed_dims
 end
@@ -17,27 +18,41 @@ struct InnovationSplitter <: AbstractSplitter
     allowed_dims
 end
 
+struct VisitedWrapper <: AbstractWrapper
+    inner
+end
+
+struct VolumeWrapper <: AbstractWrapper
+    inner
+end
+
 function find_and_apply_split(g, splitter)
     g = find_split(g, splitter)
     split(g, splitter)
 end
 
+score(node, splitter::VisitedWrapper) =
+        score(node, splitter.inner)*node.visited
 
-score(node, splitter::TraceSplitter) = tr(parameter_cov(node))*volume(node)
+score(node, splitter::VolumeWrapper) =
+        score(node, splitter.inner)*volume(node)
+
+score(node, splitter::TraceSplitter) = tr(parameter_cov(node))
+
 
 function score(node, splitter::QuadformSplitter)
     c = centroid(node)
     x = feature!(node.model, c)
-    x'*(node.model.updater.P\x) # TODO: not sure about inverse
+    x'*(cov(node.model)\x) # TODO: not sure about inverse
 end
-score(node, splitter::InnovationSplitter) = innovation_var(node.model)*volume(node)
+score(node, splitter::InnovationSplitter) = innovation_var(node.model)
 
 function find_split(g::AbstractNode, splitter::AbstractSplitter)
     maxscore = -Inf
     maxleaf = g
     breadthfirst(g) do g
         s = score(g, splitter)
-        if s > maxscore
+        if s > maxscore # TODO: when nodes are split, several consequtive nodes have the same score and the first one will always be selected. Inflate parameter cov to somewhat avoid this?
             maxscore = s
             maxleaf = g
         end
@@ -56,18 +71,20 @@ function find_split(g::AbstractNode, splitter::RandomSplitter)
     end
 end
 
-@inline allowed_dim(splitter,i) = i ∈ splitter.allowed_dims
+@inline allowed_dim(splitter,i) = i ∈ allowed_dims(splitter)
+@inline allowed_dim(splitter::AbstractWrapper,i) = allowed_dim(splitter.inner, i)
+
+@inline allowed_dims(splitter) = splitter.allowed_dims
+@inline allowed_dims(splitter::AbstractWrapper) = allowed_dims(splitter.inner)
 
 "split(node::AbstractNode, splitter::AbstractSplitter)
 Split node with highest score."
-function Base.split(node::AbstractNode, splitter::AbstractSplitter)
-    scores = Vector{Float64}(undef,length(node.domain))
-    for i in eachindex(scores)
-        scores[i] = allowed_dim(splitter,i) ? volume(node.domain[i]) : -Inf
+function Base.split(node::LeafNode, splitter::AbstractSplitter)
+    cell_dims = map(eachindex(node.domain)) do i
+        allowed_dim(splitter,i) ? volume(node.domain[i]) : -Inf
     end
-    dim = findmax(scores)[2]
-    # dim = findmax(collect(d[2]-d[1] for d in node.domain))[2]
-    split(node, dim)
+    widest_dim = findmax(cell_dims)[2]
+    split(node, widest_dim)
     node
 end
 
@@ -80,11 +97,10 @@ end
 # end
 
 
-function Base.split(g::AbstractNode, dim::Integer, split = :half)
-    @assert isleaf(g) "Can only split leaf nodes"
+function Base.split(g::LeafNode, dim::Integer, split = :half)
     g.domain
-    if split == :half
-        split = (g.domain[dim][1]+g.domain[dim][2])/2
+    if split === :half
+        split = centroid(g.domain[dim])
     end
     model = g.model
     node  = GridNode(parent = g.parent, domain=g.domain, dim=dim, split=split)
@@ -103,7 +119,7 @@ function Base.split(g::AbstractNode, dim::Integer, split = :half)
     rdomain = copy(node.domain)
     ldomain[dim] = (ldomain[dim][1], split)
     rdomain[dim] = (split, rdomain[dim][2])
-    node.left = LeafNode(node, g.model, ldomain)
-    node.right = LeafNode(node, deepcopy(g.model), rdomain)
+    node.left = LeafNode(node, g.model, ldomain, false)
+    node.right = LeafNode(node, deepcopy(g.model), rdomain, false)
     node
 end

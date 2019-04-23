@@ -34,18 +34,22 @@ end
     parent = nothing
     model = nothing
     domain = [(-1.,1.)]
+    visited = false
 end
 
-isleaf(g) = g.dim == 0
+visited(l::LeafNode) = l.visited
+visited(n) = any(visited, Leaves(n))
+
 isleaf(g::LeafNode) = true
 isleaf(g::GridNode) = false
 isleaf(g::RootNode) = false
-isroot(g::LeafNode) = false
-isroot(g::GridNode) = false
-isroot(g::RootNode) = true
+# isroot(g::LeafNode) = false
+# isroot(g::GridNode) = false
+# isroot(g::RootNode) = true
+
+walk_down(g::LeafNode, args...) = g
 
 function walk_down(g, args...)
-    isleaf(g) && (return g) # Reached the end
     walk_down(active_node(g, args...), args...)
 end
 
@@ -60,11 +64,8 @@ function depth(node)
     d
 end
 
+depthfirst(f,g::LeafNode) = (f(g);g)
 function depthfirst(f,g)
-    if isleaf(g)
-        f(g)
-        return g
-    end
     depthfirst(f, g.left)
     depthfirst(f, g.right)
 end
@@ -93,7 +94,7 @@ function countnodes(root)
     counter
 end
 
-function Grid(domain::AbstractVector{<:Tuple}, model, splitter; initial_split=splitter.allowed_dims)
+function Grid(domain::AbstractVector{<:Tuple}, model, splitter; initial_split=allowed_dims(splitter))
     initial_split == 0 && (return LeafNode(model=model, domain=domain))
     nsplits = length(initial_split)
     seed = split(LeafNode(model=model, domain=domain), initial_split[1])
@@ -128,11 +129,13 @@ end
 
 function update!(g::AbstractNode, x, u, y)
     active = walk_down(g,x,u)
+    active.visited = true
     update!(active.model, x, u, y)
 end
 
 function update!(g::AbstractNode, x, y)
     active = walk_down(g,x)
+    active.visited = true
     update!(active.model, x, y)
 end
 

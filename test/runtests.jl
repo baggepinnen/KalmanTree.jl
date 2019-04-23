@@ -1,7 +1,7 @@
 
 using Test, LinearAlgebra, Random
 using KalmanTree
-using KalmanTree: depthfirst, breadthfirst
+using KalmanTree: depthfirst, breadthfirst, allowed_dims
 
 root = LeafNode()
 @test root.parent === nothing
@@ -13,6 +13,8 @@ root = split(root, 1, 0.0)
 @test root.right.parent === root
 @test root.left.domain[1] == (-1,0)
 @test root.right.domain[1] == (0,1)
+@test all(!visited, Leaves(root))
+@test !visited(root)
 
 split(root.left, 1, -0.5)
 split(root.right, 1)
@@ -21,7 +23,8 @@ split(root.right, 1)
 @test root.left.left.domain[1] == (-1,-0.5)
 @test root.left.right.domain[1] == (-0.5,0)
 @test root.right.domain[1] == (0,1)
-
+@test all(!visited, Leaves(root))
+@test !visited(root)
 
 
 @test root.left.left isa LeafNode
@@ -30,7 +33,8 @@ split(root.right, 1)
 @test walk_down(root, 2) === root.right.right
 @test walk_down(root, 0.4) === root.right.left
 @test walk_down(root, -0.4) === root.left.right
-
+@test all(!visited, Leaves(root))
+@test !visited(root)
 
 @test countnodes(root) == 4
 
@@ -48,6 +52,7 @@ g = Grid(domain, nothing, splitter)
 @test g.left.domain == [(-1,0),(-1,1),(-1,1)]
 @test g.right.domain == [(0,1),(-1,1),(-1,1)]
 @test g.left.left.domain == [(-1,0),(-1,0),(-1,1)]
+
 
 domain = [(-1,1),(-1,1),(-1,1),(-2,2)]
 splitter = RandomSplitter(1:4)
@@ -126,21 +131,17 @@ end  < 1e-6
 
 # Integration tests
 
-#= Notes:
-Should splitting along action dimensions be allowed? Then how does one find argmaxₐ(Q)? since this max can be outside the domain of the model.
-If splts along action dimensions are kept at the bottom of the tree, one could operate on a subtree when finding argmaxₐ(Q). Each argmax is a box-constrained QP where the domain in a-dimensions determine the bounds. With this strategy, argmaxₐ must be carried out as many times as there are leaves in the subtree corresponding to the s-coordinate.
-First, the unconstraind argmax can be calculated for each cell. If the highest is inside its bounds, no box-constrained QP has to be solved
-=#
+
 
 ##
 # nx,nu = 2,2
 # domain = [(-1.,1.),(-1.,1.),(-1.,1.),(-1.,1.)]
 # model = QuadraticModel(nx+nu; actiondims=1:2)
 # splitter = KalmanTree.InnovationSplitter(3:4)
-nx,nu = 2,1
-domain = [(-1.,1.),(-1.,1.),(-1.,1.)]
+nx,nu = 1,1
+domain = [(-1.,1.),(-1.,1.)]#,(-1.,1.)]
 model = QuadraticModel(nx+nu; actiondims=1:1)
-splitter = KalmanTree.InnovationSplitter(2:3)
+splitter = InnovationSplitter(2:2) |> VolumeWrapper |> VisitedWrapper
 g = Grid(domain, model, splitter)
 # splitter = TraceSplitter(1:2)
 # splitter = NormalizedTraceSplitter(1:2)
@@ -150,7 +151,7 @@ f(x,u) = sin(3sum(x)) + sum(-(u.-x).^2)
 for i = 1:10000
     if i % 1000 == 0
         KalmanTree.find_and_apply_split(g, splitter)
-        @show countnodes(g)
+        # @show countnodes(g)
     end
     x = 2 .*rand(nx) .-1
     u = 2 .*rand(nu) .-1
@@ -159,25 +160,31 @@ for i = 1:10000
     push!(U,u)
     push!(Y,y)
     yh = predict(g, x, u)
-    @show i
-    @show y-yh
+    # @show i
+    # @show y-yh
     update!(g,x,u,y)
     yh = predict(g, x, u)
-    @show y-yh
+    # @show y-yh
 end
-plot(g, :value, dims=splitter.allowed_dims)
-plot(g, :cov, dims=splitter.allowed_dims[1:2])
+
+@test visited(g)
+plot(g, :value, dims=allowed_dims(splitter))
+plot(g, :cov, dims=allowed_dims(splitter))
+plot(g, :value)
+plot(g, :cov)
 
 ##
 # plotly()
 # gr()
+predfun = (x,u)->predict(g,x,u)
 po = (zlims=(-1.5,1.5), clims=(-2,2))
 xu = LinRange(-1,1,30),LinRange(-1,1,30)
 surface(xu..., f; title="True fun", layout=5, po...)
-surface!(xu..., (x,u)->predict(g,x,u); title="Approximation", subplot=2, po...)
-surface!(xu..., (x,u)->predict(g,x,u)-f(x,u); title="Error", subplot=3, po...)
+surface!(xu..., predfun; title="Approximation", subplot=2, po...)
+surface!(xu..., (x,u)->predfun(x,u)-f(x,u); title="Error", subplot=3, po...)
 plot!(g, :value, title="Grid cells", subplot=4)
 plot!(g, :cov, title="Grid cells", subplot=5)
+@test all(x->abs(predfun(x...)-f(x...))<1, Iterators.product(xu...))
 
 ##
 
