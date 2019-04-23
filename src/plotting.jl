@@ -5,13 +5,14 @@
     else
         colors = [predict(l, centroid(l)) for l in Leaves(g)]
     end
-    mc = maximum(colors)
+    colors .-= minimum(colors)
+    colors ./= maximum(colors)
     colorbar := true
     label := ""
     legend := false
     cg = cgrad(:inferno)
     for (i,l) in enumerate(Leaves(g))
-        c = colors[i]/mc
+        c = colors[i]
         @series begin
             color := cg[c]
             rect(l.domain)

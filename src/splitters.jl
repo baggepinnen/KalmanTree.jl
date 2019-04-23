@@ -1,20 +1,20 @@
 
 abstract type AbstractSplitter end
 abstract type AbstractWrapper <: AbstractSplitter end
-struct TraceSplitter <: AbstractSplitter
+Base.@kwdef struct TraceSplitter <: AbstractSplitter
     allowed_dims
 end
-struct CountSplitter <: AbstractSplitter
+Base.@kwdef struct CountSplitter <: AbstractSplitter
     allowed_dims
 end
-struct QuadformSplitter <: AbstractSplitter
+Base.@kwdef struct QuadformSplitter <: AbstractSplitter
     allowed_dims
 end
-struct RandomSplitter <: AbstractSplitter
+Base.@kwdef struct RandomSplitter <: AbstractSplitter
     allowed_dims
 end
 
-struct InnovationSplitter <: AbstractSplitter
+Base.@kwdef struct InnovationSplitter <: AbstractSplitter
     allowed_dims
 end
 
@@ -45,7 +45,7 @@ function score(node, splitter::QuadformSplitter)
     x = feature!(node.model, c)
     x'*(cov(node.model)\x) # TODO: not sure about inverse
 end
-score(node, splitter::InnovationSplitter) = innovation_var(node.model)
+score(node, splitter::InnovationSplitter) = sqrt(abs(innovation_var(node.model)))
 
 function find_split(g::AbstractNode, splitter::AbstractSplitter)
     maxscore = -Inf
@@ -87,6 +87,8 @@ function Base.split(node::LeafNode, splitter::AbstractSplitter)
     split(node, widest_dim)
     node
 end
+
+Base.split(::Nothing, args...) = nothing
 
 # "split(node::AbstractNode, splitter::AllBelowSplitter)
 # Split node with highest score."

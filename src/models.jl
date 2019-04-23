@@ -203,13 +203,13 @@ end
 Base.:∈(x::AbstractArray, dom::Vector{<:Tuple}) = all(x ∈ d for (x,d) in zip(x,dom))
 Base.:∈(x::Number, dom::Tuple{<:Number,<:Number}) = dom[1] ≤ x ≤ dom[2]
 
-Statistics.cov(m::AbstractModel) = cov(m.updater)
 Statistics.cov(u::AbstractUpdater) = u.P
-innovation_var(m::AbstractModel) = innovation_var(m.updater)
+Statistics.cov(m::AbstractModel) = cov(m.updater)
 innovation_var(u::AbstractUpdater) = value(u.σ2)
+innovation_var(m::AbstractModel) = innovation_var(m.updater)
 innovation_var(n::LeafNode) = innovation_var(n.model)
-parameter_cov(m::AbstractModel) = parameter_cov(m.updater)
 parameter_cov(u::AbstractUpdater) = value(u.σ2)*cov(u)
+parameter_cov(m::AbstractModel) = parameter_cov(m.updater)
 parameter_cov(n::LeafNode) = parameter_cov(n.model)
 # Q = [Qxx Qxu qx;
 #      Qxu' Quu qu;

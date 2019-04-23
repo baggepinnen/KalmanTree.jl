@@ -141,7 +141,7 @@ end  < 1e-6
 nx,nu = 1,1
 domain = [(-1.,1.),(-1.,1.)]#,(-1.,1.)]
 model = QuadraticModel(nx+nu; actiondims=1:1)
-splitter = InnovationSplitter(2:2) |> VolumeWrapper |> VisitedWrapper
+splitter = InnovationSplitter(1:2) |> VolumeWrapper |> VisitedWrapper
 g = Grid(domain, model, splitter)
 # splitter = TraceSplitter(1:2)
 # splitter = NormalizedTraceSplitter(1:2)
@@ -149,7 +149,7 @@ g = Grid(domain, model, splitter)
 X,U,Y = [],[],[]
 f(x,u) = sin(3sum(x)) + sum(-(u.-x).^2)
 for i = 1:10000
-    if i % 1000 == 0
+    if i % 100 == 0
         KalmanTree.find_and_apply_split(g, splitter)
         # @show countnodes(g)
     end
@@ -177,14 +177,16 @@ plot(g, :cov)
 # plotly()
 # gr()
 predfun = (x,u)->predict(g,x,u)
+errorfun = (x,u)->predfun(x,u)-f(x,u)
 po = (zlims=(-1.5,1.5), clims=(-2,2))
 xu = LinRange(-1,1,30),LinRange(-1,1,30)
 surface(xu..., f; title="True fun", layout=5, po...)
 surface!(xu..., predfun; title="Approximation", subplot=2, po...)
-surface!(xu..., (x,u)->predfun(x,u)-f(x,u); title="Error", subplot=3, po...)
+surface!(xu..., errorfun; title="Error", subplot=3, po...)
 plot!(g, :value, title="Grid cells", subplot=4)
 plot!(g, :cov, title="Grid cells", subplot=5)
-@test all(x->abs(predfun(x...)-f(x...))<1, Iterators.product(xu...))
+@info "Error: ", sum(x->abs(errorfun(x...)), Iterators.product(xu...))
+@test all(x->abs(errorfun(x...))<1, Iterators.product(xu...))
 
 ##
 

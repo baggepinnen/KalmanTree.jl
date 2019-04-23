@@ -11,7 +11,7 @@ default(size=(1800,1000))
 nx,nu = 4,1
 domain = [(0,1), (-1.1,1.1) ,(-3.5,3.5) ,(-0.3,0.3) ,(-3.5,3.5)]
 
-splitter = InnovationSplitter(2:5) |> VolumeWrapper |> VisitedWrapper
+splitter = InnovationSplitter(allowed_dims=1:5) |> VolumeWrapper |> VisitedWrapper
 
 struct Qfun{T1,T2}
     grid::T1
@@ -62,13 +62,13 @@ function Qlearning(Q, policy, num_episodes, α; plotting=true, target_update_int
         # α *= decay_rate # Decay the learning rate
         decay!(policy) # Decay greedyness
         if i % target_update_interval == 0
-            Qt = deepcopy(Q)
+            # Qt = deepcopy(Q)
             KalmanTree.find_and_apply_split(Q.grid, Q.splitter)
             # @show countnodes(Q.grid)
         end
         for (s,a,r,s1) in ep # An episode object is iterable
-            # Q[s,a] = α*(r + γ*max_a(Q, s1) - Q(s,a)) # Update Q using Q-learning
-            Q[s,a] = α*(r + γ*Qt(s1,argmax_a(Q, s1)) - Qt(s,a)) # Update Q using double Q-learning
+            Q[s,a] = α*(r + γ*max_a(Q, s1) - Q(s,a)) # Update Q using Q-learning
+            # Q[s,a] = α*(r + γ*Qt(s1,argmax_a(Q, s1)) - Qt(s,a)) # Update Q using double Q-learning
             m = max.(m,abs.(s))
         end
         push!(reward_history, i, ep.total_reward)
@@ -84,14 +84,14 @@ function Qlearning(Q, policy, num_episodes, α; plotting=true, target_update_int
     reward_history
 end
 #
-# ho = @hyperopt for i=60, sampler = RandomSampler(),
-#     α   = LinRange(0.01,0.99,200),
-#     λ   = exp10.(LinRange(-8,0,200)),
-#     # λ   = 1 .- exp10.(LinRange(-4,-2,50)),
-#     tui = round.(Int, exp10.(LinRange(1, 2, 200))),
-#     P0  = exp10.(LinRange(-1, 3, 200))
+ho = @hyperopt for i=40, sampler = RandomSampler(),
+    α   = LinRange(0.01,0.99,200),
+    λ   = exp10.(LinRange(-8,4,200)),
+    # λ   = 1 .- exp10.(LinRange(-4,-2,50)),
+    tui = round.(Int, exp10.(LinRange(1, 2, 200))),
+    P0  = exp10.(LinRange(-3, 4, 200))
 
-α, λ, tui, P0 = 1, 1e-4, 10, 10
+# α, λ, tui, P0 = 0.5, 1e2, 20, 1e-2
 m        = QuadraticModel(nx+nu; actiondims=1:1, λ=λ, P0=P0)
 gridm        = Grid(domain, m, splitter, initial_split=2:5)
 Q            = Qfun(gridm, splitter); # Q is now our Q-function approximator
@@ -103,13 +103,13 @@ decay_rate   = 0.992 # decay rate for learning rate and ϵ
 policy = ϵGreedyPolicy(ϵ, decay_rate, Q);
 rh = Qlearning(Q, policy, num_episodes, α, plotting = false, target_update_interval=tui)
 sum(rh.values)
-# end
-# plot(ho)
+end
+plot(ho)
 
 
-xp = map(volume, Leaves(gridm))
-yp = map(innovation_var, Leaves(gridm))
-scatter(xp,yp)
+# xp = map(volume, Leaves(gridm))
+# yp = map(innovation_var, Leaves(gridm))
+# scatter(xp,yp)
 # julia> maximum(ho)
 # (Real[0.67, 0.999854, 28, 6.25055], 200.0)
 
