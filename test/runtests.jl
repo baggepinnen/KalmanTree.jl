@@ -1,5 +1,5 @@
 
-using Test, LinearAlgebra, Random
+using Test, LinearAlgebra, Random, Statistics
 using KalmanTree
 using KalmanTree: depthfirst, breadthfirst, allowed_dims
 @testset "KalmanTree" begin
