@@ -133,22 +133,25 @@ First, the unconstraind argmax can be calculated for each cell. If the highest i
 =#
 
 ##
-nx,nu = 2,2
-domain = [(-1.,1.),(-1.,1.),(-1.,1.),(-1.,1.)]#,(-1.,1.)]
-model = QuadraticModel(nx+nu; actiondims=1:2)
-splitter = RandomSplitter(3:4)
+# nx,nu = 2,2
+# domain = [(-1.,1.),(-1.,1.),(-1.,1.),(-1.,1.)]
+# model = QuadraticModel(nx+nu; actiondims=1:2)
+# splitter = KalmanTree.InnovationSplitter(3:4)
+nx,nu = 2,1
+domain = [(-1.,1.),(-1.,1.),(-1.,1.)]
+model = QuadraticModel(nx+nu; actiondims=1:1)
+splitter = KalmanTree.InnovationSplitter(2:3)
 g = Grid(domain, model, splitter)
 # splitter = TraceSplitter(1:2)
 # splitter = NormalizedTraceSplitter(1:2)
 # splitter = QuadformSplitter(1:2)
 X,U,Y = [],[],[]
-f(x,u) = sin(3sum(x)) + sum(-(u-x).^2)
+f(x,u) = sin(3sum(x)) + sum(-(u.-x).^2)
 for i = 1:10000
-    if i % 100 == 0
-        splitter(g)
+    if i % 1000 == 0
+        KalmanTree.find_and_apply_split(g, splitter)
         @show countnodes(g)
     end
-    @show i
     x = 2 .*rand(nx) .-1
     u = 2 .*rand(nu) .-1
     y = f(x,u) + 0.1*(sum(x)+sum(u))*randn()
@@ -156,22 +159,25 @@ for i = 1:10000
     push!(U,u)
     push!(Y,y)
     yh = predict(g, x, u)
+    @show i
     @show y-yh
     update!(g,x,u,y)
     yh = predict(g, x, u)
     @show y-yh
 end
-plot(g, :value)
+plot(g, :value, dims=splitter.allowed_dims)
+plot(g, :cov, dims=splitter.allowed_dims[1:2])
 
 ##
 # plotly()
 # gr()
 po = (zlims=(-1.5,1.5), clims=(-2,2))
 xu = LinRange(-1,1,30),LinRange(-1,1,30)
-surface(xu..., f; title="True fun", layout=4, po...)
+surface(xu..., f; title="True fun", layout=5, po...)
 surface!(xu..., (x,u)->predict(g,x,u); title="Approximation", subplot=2, po...)
 surface!(xu..., (x,u)->predict(g,x,u)-f(x,u); title="Error", subplot=3, po...)
 plot!(g, :value, title="Grid cells", subplot=4)
+plot!(g, :cov, title="Grid cells", subplot=5)
 
 ##
 

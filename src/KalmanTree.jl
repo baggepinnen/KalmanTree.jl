@@ -4,15 +4,17 @@ using Parameters, AbstractTrees, RecipesBase, DifferentialDynamicProgramming, Po
 
 export Grid, LeafNode, countnodes, walk_down, walk_up, argmax_u
 export QuadraticModel, update!, predict, NewtonUpdater, GradientUpdater, RLSUpdater, KalmanUpdater, feature!
-export RandomSplitter, TraceSplitter, NormalizedTraceSplitter, QuadformSplitter
+export RandomSplitter, TraceSplitter, QuadformSplitter, InnovationSplitter
 
 
-
+export print_tree
 
 
 
 include("tree_tools.jl")
 include("domain_tools.jl")
+include("splitters.jl")
 include("models.jl")
-using Plots
+include("plotting.jl")
+
 end

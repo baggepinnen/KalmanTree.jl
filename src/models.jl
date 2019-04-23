@@ -22,11 +22,12 @@ end
 
 function update!(m::KalmanUpdater, w, ϕ, y)
     # TODO: this can be made more efficient
-    P,λ  = m.P, m.λ
+    # TODO: add m.σ2 instead of 1
+    P,λ,σ²  = m.P, m.λ, value(m.σ2)
     ϕᵀP  = ϕ'*P
     Pϕ   = P*ϕ
     ϕᵀPϕ = ϕᵀP*ϕ
-    K    = Pϕ ./(1+ϕᵀPϕ)
+    K    = Pϕ ./(σ²+ϕᵀPϕ)
     P   .= P .- K*ϕᵀP + λ*I
     P   .= (P .+ P') ./ 2
     e    = y - ϕ'w
@@ -206,9 +207,10 @@ Statistics.cov(m::AbstractModel) = cov(m.updater)
 Statistics.cov(u::AbstractUpdater) = u.P
 innovation_var(m::AbstractModel) = innovation_var(m.updater)
 innovation_var(u::AbstractUpdater) = value(u.σ2)
+innovation_var(n::LeafNode) = innovation_var(n.model)
 parameter_cov(m::AbstractModel) = parameter_cov(m.updater)
 parameter_cov(u::AbstractUpdater) = value(u.σ2)*cov(u)
-
+parameter_cov(n::LeafNode) = parameter_cov(n.model)
 # Q = [Qxx Qxu qx;
 #      Qxu' Quu qu;
 #      qx'  qu' q]
