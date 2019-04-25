@@ -1,5 +1,5 @@
 abstract type AbstractUpdater end
-@with_kw struct RLSUpdater{TP,Tl,Tσ} <: AbstractUpdater
+@with_kw struct RLSUpdater{TP,Tl,Tσ<:Variance} <: AbstractUpdater
     P::TP
     λ::Tl = 0.999
     σ2::Tσ = Variance(weight=McclainWeight(0.01))
@@ -16,7 +16,7 @@ function update!(m::RLSUpdater, w, ϕ, y)
     w .+= P*ϕ .* e
 end
 
-@with_kw struct KalmanUpdater{TP,Tl,Tσ} <: AbstractUpdater
+@with_kw struct KalmanUpdater{TP,Tl,Tσ<:Variance} <: AbstractUpdater
     P::TP
     λ::Tl = 1.
     σ2::Tσ = Variance(weight=McclainWeight(0.01)) # TODO: it seems OnlineStats are using weight as opposed to forgetting factor, does w = 1-λ hold?
@@ -38,9 +38,9 @@ function update!(m::KalmanUpdater, w, ϕ, y)
     w  .+= K .* e
 end
 
-w2Q(w) = zeros(p2n(length(w)),p2n(length(w)))
-p2n(p) = Int((-1 + sqrt(1+8p))/2)
-n2p(n) = n*(n+1)÷2
+w2Q(w) = zeros(p2n(length(w))+1,p2n(length(w))+1)
+p2n(p) = Int((-1 + sqrt(1+8p))/2)-1
+n2p(n) = (n+=1;n*(n+1)÷2)
 @assert all(i |> n2p |> p2n == i for i in 1:20)
 
 abstract type AbstractModel end
@@ -168,10 +168,11 @@ function project!(u, domain, g)
     g
 end
 
-@with_kw struct NewtonUpdater{σT} <: AbstractUpdater
+@with_kw struct NewtonUpdater{σT<:Variance} <: AbstractUpdater
     α::Float64
     σ2::σT = Variance(;weight=McclainWeight(0.01))
 end
+NewtonUpdater(α) = NewtonUpdater(α=α)
 
 function update!(m::NewtonUpdater, w, ϕ, y)
     n,e = newton(m, w, ϕ, y)
@@ -190,10 +191,11 @@ function newton(m::NewtonUpdater, w, ϕ, y)
     # -(ϕ.*e), e
 end
 
-@with_kw struct GradientUpdater{σT} <: AbstractUpdater
+@with_kw struct GradientUpdater{σT<:Variance} <: AbstractUpdater
     α::Float64
     σ2::σT = Variance(;weight=McclainWeight(0.01))
 end
+GradientUpdater(α) = GradientUpdater(α=α)
 
 function update!(m::GradientUpdater, w, ϕ, y)
     e = (y - ϕ'w)

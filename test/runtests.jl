@@ -81,7 +81,7 @@ using KalmanTree: depthfirst, breadthfirst, allowed_dims
         fq(x) = x'Q*x + q'x + c
         y = map(fq,x,u)
 
-        m = QuadraticModel(5, λ=1, P0=100000, actiondims=1:3)
+        m = QuadraticModel(5, updater=KalmanUpdater(5), actiondims=1:3)
         P0 = det(cov(m))
         update!(m,x[1],u[1],y[1])
         foreach(x,u,y) do x,u,y
@@ -105,7 +105,7 @@ using KalmanTree: depthfirst, breadthfirst, allowed_dims
 
 
 
-        updater = NewtonUpdater(0.5, 0.999)
+        updater = NewtonUpdater(0.5)
         m = QuadraticModel(5, actiondims=1:3, updater = updater)
         for i = 1:5
             foreach(x,u,y) do x,u,y
@@ -117,7 +117,7 @@ using KalmanTree: depthfirst, breadthfirst, allowed_dims
             abs2(y - predict(m,x,u))
         end  < 1e-6
 
-        updater = GradientUpdater(0.01, 0.999)
+        updater = GradientUpdater(0.01)
         m = QuadraticModel(5, actiondims=1:3, updater = updater)
         for i = 1:50
             foreach(x,u,y) do x,u,y
@@ -137,7 +137,7 @@ using KalmanTree: depthfirst, breadthfirst, allowed_dims
         f = (x,u) -> sin(3sum(x)) + sum(-(u.-x).^2)
         function integrated_test(nx,nu)
             domain = fill((-1.,1.), nx+nu)
-            model = QuadraticModel(nx+nu; actiondims=1:nu)
+            model = QuadraticModel(nx+nu; updater=KalmanUpdater(nx+nu), actiondims=1:nu)
             splitter = InnovationSplitter(nu+1:nu+nx) |> VolumeWrapper |> VisitedWrapper
             g = Grid(domain, model, splitter)
             # X,U,Y = [],[],[]
