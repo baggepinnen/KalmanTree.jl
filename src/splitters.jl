@@ -27,8 +27,8 @@ struct VolumeWrapper <: AbstractWrapper
 end
 
 function find_and_apply_split(g, splitter)
-    g = find_split(g, splitter)
-    split(g, splitter)
+    maybe_g = find_split(g, splitter)
+    split(maybe_g, splitter)
 end
 
 score(node, splitter::VisitedWrapper) =
@@ -49,7 +49,7 @@ score(node, splitter::InnovationSplitter) = sqrt(abs(innovation_var(node.model))
 
 function find_split(g::AbstractNode, splitter::AbstractSplitter)
     maxscore = -Inf
-    maxleaf = g
+    maxleaf = nothing
     breadthfirst(g) do g
         s = score(g, splitter)
         if s > maxscore # TODO: when nodes are split, several consequtive nodes have the same score and the first one will always be selected. Inflate parameter cov to somewhat avoid this?

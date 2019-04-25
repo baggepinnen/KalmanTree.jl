@@ -1,6 +1,6 @@
 module KalmanTree
 using Statistics, LinearAlgebra
-using Parameters, AbstractTrees, RecipesBase, DifferentialDynamicProgramming, PositiveFactorizations, OnlineStats
+using Parameters, AbstractTrees, RecipesBase, DifferentialDynamicProgramming, PositiveFactorizations, OnlineStats, FillArrays
 
 using Plots # for cgrad
 

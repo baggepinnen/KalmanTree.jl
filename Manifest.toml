@@ -57,6 +57,12 @@ version = "0.4.0"
 deps = ["Random", "Serialization", "Sockets"]
 uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 
+[[FillArrays]]
+deps = ["LinearAlgebra", "Random", "SparseArrays", "Test"]
+git-tree-sha1 = "ef00921b6445d688bd8354090cc6a0ab4322f945"
+uuid = "1a297f60-69ca-5386-bcde-b61e274b549b"
+version = "0.6.0"
+
 [[FixedPointNumbers]]
 deps = ["Test"]
 git-tree-sha1 = "b8045033701c3b10bf2324d7203404be7aef88ba"

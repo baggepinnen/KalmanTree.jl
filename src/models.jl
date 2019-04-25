@@ -1,9 +1,11 @@
 abstract type AbstractUpdater end
 @with_kw struct RLSUpdater{TP,Tl,Tσ} <: AbstractUpdater
     P::TP
-    λ::Tl
-    σ2::TσMcclainWeight} = Variance(weight=McclainWeight(0.01))
+    λ::Tl = 0.999
+    σ2::Tσ = Variance(weight=McclainWeight(0.01))
 end
+
+RLSUpdater(n::Int; kwargs...) = RLSUpdater(;P=100000Matrix(Eye(n2p(n))), kwargs...)
 
 function update!(m::RLSUpdater, w, ϕ, y)
     P,λ = m.P, m.λ
@@ -16,9 +18,11 @@ end
 
 @with_kw struct KalmanUpdater{TP,Tl,Tσ} <: AbstractUpdater
     P::TP
-    λ::Tl
+    λ::Tl = 1.
     σ2::Tσ = Variance(weight=McclainWeight(0.01)) # TODO: it seems OnlineStats are using weight as opposed to forgetting factor, does w = 1-λ hold?
 end
+
+KalmanUpdater(n::Int; kwargs...) = KalmanUpdater(;P=100000Matrix(Eye(n2p(n))), kwargs...)
 
 function update!(m::KalmanUpdater, w, ϕ, y)
     # TODO: this can be made more efficient
@@ -34,25 +38,25 @@ function update!(m::KalmanUpdater, w, ϕ, y)
     w  .+= K .* e
 end
 
+w2Q(w) = zeros(p2n(length(w)),p2n(length(w)))
+p2n(p) = Int((-1 + sqrt(1+8p))/2)
+n2p(n) = n*(n+1)÷2
+@assert all(i |> n2p |> p2n == i for i in 1:20)
+
 abstract type AbstractModel end
 
 @with_kw struct QuadraticModel <: AbstractModel
     w
-    updater = KalmanUpdater(P=Matrix{Float64}(I,length(w),length(w)), λ=0.999)
+    updater
     ϕ = similar(w)
-    actiondims = 1:length(w)
+    actiondims = 1:p2n(length(w))
     Q = w2Q(w)
 end
 
-w2Q(w) = zeros(p2n(length(w)),p2n(length(w)))
-p2n(p) = Int((-1 + sqrt(1+8p))/2)
-
-function QuadraticModel(n::Int;λ=0.999,P0=1000,kwargs...)
-    n+=1
-    w = zeros(n*(n+1)÷2)
-    updater = KalmanUpdater(P=Matrix{Float64}(P0*I,length(w),length(w)), λ=λ)
-    QuadraticModel(;w = w, updater=updater, kwargs...)
+function QuadraticModel(n::Int; kwargs...)
+    QuadraticModel(;w = zeros(n2p(n)), kwargs...)
 end
+
 
 function feature!(m::QuadraticModel, x, u)
     ux = @view m.Q[1:length(x)+length(u),1]
@@ -164,10 +168,9 @@ function project!(u, domain, g)
     g
 end
 
-struct NewtonUpdater <: AbstractUpdater
+@with_kw struct NewtonUpdater{σT} <: AbstractUpdater
     α::Float64
-    σ2::OnlineStats.Variance{Float64,ExponentialWeight}
-    NewtonUpdater(α, λ::Number) = new(α, Variance(;weight=ExponentialWeight(λ)))
+    σ2::σT = Variance(;weight=McclainWeight(0.01))
 end
 
 function update!(m::NewtonUpdater, w, ϕ, y)
@@ -187,10 +190,9 @@ function newton(m::NewtonUpdater, w, ϕ, y)
     # -(ϕ.*e), e
 end
 
-struct GradientUpdater <: AbstractUpdater
+@with_kw struct GradientUpdater{σT} <: AbstractUpdater
     α::Float64
-    σ2::OnlineStats.Variance{Float64,ExponentialWeight}
-    GradientUpdater(α, λ::Number) = new(α, Variance(;weight=ExponentialWeight(λ)))
+    σ2::σT = Variance(;weight=McclainWeight(0.01))
 end
 
 function update!(m::GradientUpdater, w, ϕ, y)

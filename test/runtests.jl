@@ -81,7 +81,7 @@ using KalmanTree: depthfirst, breadthfirst, allowed_dims
         fq(x) = x'Q*x + q'x + c
         y = map(fq,x,u)
 
-        m = QuadraticModel(5, actiondims=1:3)
+        m = QuadraticModel(5, λ=1, P0=100000, actiondims=1:3)
         P0 = det(cov(m))
         update!(m,x[1],u[1],y[1])
         foreach(x,u,y) do x,u,y
@@ -99,7 +99,7 @@ using KalmanTree: depthfirst, breadthfirst, allowed_dims
         @test isposdef(-Quu)
         @test sum(abs, -Quu \ Q[1:3,1:3] - I) < 5
         @test sum(abs, -2qu - q[1:3]) < 1e-5
-        @test sum(abs, -Qux - Q[1:3,4:5]) < 1e-5
+        @test sum(abs, -Qux - Q[1:3,4:5]) < 1.3e-5
         @test abs(m.w[end] - c) < 1e-5
 
 
