@@ -1,8 +1,8 @@
 abstract type AbstractUpdater end
-@with_kw struct RLSUpdater{TP,Tl} <: AbstractUpdater
+@with_kw struct RLSUpdater{TP,Tl,Tσ} <: AbstractUpdater
     P::TP
     λ::Tl
-    σ2::OnlineStats.Variance{Float64,ExponentialWeight} = Variance(weight=ExponentialWeight(λ))
+    σ2::TσMcclainWeight} = Variance(weight=McclainWeight(0.01))
 end
 
 function update!(m::RLSUpdater, w, ϕ, y)
@@ -14,15 +14,14 @@ function update!(m::RLSUpdater, w, ϕ, y)
     w .+= P*ϕ .* e
 end
 
-@with_kw struct KalmanUpdater{TP,Tl} <: AbstractUpdater
+@with_kw struct KalmanUpdater{TP,Tl,Tσ} <: AbstractUpdater
     P::TP
     λ::Tl
-    σ2::OnlineStats.Variance{Float64,ExponentialWeight} = Variance(weight=ExponentialWeight(λ))
+    σ2::Tσ = Variance(weight=McclainWeight(0.01)) # TODO: it seems OnlineStats are using weight as opposed to forgetting factor, does w = 1-λ hold?
 end
 
 function update!(m::KalmanUpdater, w, ϕ, y)
     # TODO: this can be made more efficient
-    # TODO: add m.σ2 instead of 1
     P,λ,σ²  = m.P, m.λ, value(m.σ2)
     ϕᵀP  = ϕ'*P
     Pϕ   = P*ϕ
@@ -39,7 +38,7 @@ abstract type AbstractModel end
 
 @with_kw struct QuadraticModel <: AbstractModel
     w
-    updater = KalmanUpdater(P=Matrix{Float64}(I,length(w),length(w)), λ=1.0)
+    updater = KalmanUpdater(P=Matrix{Float64}(I,length(w),length(w)), λ=0.999)
     ϕ = similar(w)
     actiondims = 1:length(w)
     Q = w2Q(w)
@@ -48,7 +47,7 @@ end
 w2Q(w) = zeros(p2n(length(w)),p2n(length(w)))
 p2n(p) = Int((-1 + sqrt(1+8p))/2)
 
-function QuadraticModel(n::Int;λ=1.0,P0=1000,kwargs...)
+function QuadraticModel(n::Int;λ=0.999,P0=1000,kwargs...)
     n+=1
     w = zeros(n*(n+1)÷2)
     updater = KalmanUpdater(P=Matrix{Float64}(P0*I,length(w),length(w)), λ=λ)
