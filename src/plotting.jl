@@ -1,4 +1,4 @@
-@recipe function plot_tree(g::AbstractNode, indicate = :cov; dims=1:2)
+@recipe function plot_tree(g::AbstractNode, indicate = :value; dims=1:2)
     rect(d) = Shape([d[dims[1]][1],d[dims[1]][1],d[dims[1]][2],d[dims[1]][2],d[dims[1]][1]],  [d[dims[2]][1],d[dims[2]][2],d[dims[2]][2],d[dims[2]][1],d[dims[2]][1]])
     if indicate == :cov
         colors = [tr(l.model.updater.P) for l in Leaves(g)]
@@ -7,14 +7,16 @@
     end
     colors .-= minimum(colors)
     colors ./= maximum(colors)
-    colorbar := true
+    colorbar --> true
     label := ""
     legend := false
     cg = cgrad(:inferno)
     for (i,l) in enumerate(Leaves(g))
         c = colors[i]
+        # l.parent.dim ∈ dims || continue
         @series begin
             color := cg[c]
+            linecolor --> :red
             rect(l.domain)
         end
     end

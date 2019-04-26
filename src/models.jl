@@ -31,7 +31,7 @@ function update!(m::KalmanUpdater, w, ϕ, y)
     Pϕ   = P*ϕ
     ϕᵀPϕ = ϕᵀP*ϕ
     K    = Pϕ ./(σ²+ϕᵀPϕ)
-    P   .= P .- K*ϕᵀP + λ*I
+    P   .= P .- K*ϕᵀP + λ^2*I
     P   .= (P .+ P') ./ 2
     e    = y - ϕ'w
     fit!(m.σ2, e)

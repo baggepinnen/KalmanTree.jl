@@ -64,13 +64,13 @@ addprocs(4)
             # α *= decay_rate # Decay the learning rate
             decay!(policy) # Decay greedyness
             if i % target_update_interval == 0
-                # Qt = deepcopy(Q)
+                Qt = deepcopy(Q)
                 KalmanTree.find_and_apply_split(Q.grid, Q.splitter)
                 # @show countnodes(Q.grid)
             end
             for (s,a,r,s1) in ep # An episode object is iterable
-                Q[s,a] = α*(r + γ*max_a(Q, s1) - Q(s,a)) # Update Q using Q-learning
-                # Q[s,a] = α*(r + γ*Qt(s1,argmax_a(Q, s1)) - Qt(s,a)) # Update Q using double Q-learning
+                # Q[s,a] = α*(r + γ*max_a(Q, s1) - Q(s,a)) # Update Q using Q-learning
+                Q[s,a] = α*(r + γ*Qt(s1,argmax_a(Q, s1)) - Qt(s,a)) # Update Q using double Q-learning
                 m = max.(m,abs.(s))
             end
             push!(reward_history, i, ep.total_reward)
@@ -87,17 +87,16 @@ addprocs(4)
 end
 #
 
-ho = Hyperopt.@hyperopt for i=100, sampler = RandomSampler(),
-    α   = LinRange(0.5,3,200),
-    λ   = exp10.(LinRange(-10,2,200)),
-    # λ   = 1 .- exp10.(LinRange(-4,-2,50)),
-    tui = round.(Int, exp10.(LinRange(1, 2, 200))),
-    P0  = exp10.(LinRange(0, 15, 200))
+# ho = Hyperopt.@phyperopt for i=50, sampler = RandomSampler(),
+#     α   = LinRange(0.5,3,200),
+#     λ   = exp10.(LinRange(-3,1,200)),
+#     tui = round.(Int, exp10.(LinRange(1, 2, 200)))
+    # P0  = exp10.(LinRange(0, 15, 200))
 
     @show i
-    α, λ, tui, P0 = 0.5, 1e2, 20, 1e10
-    # updater = KalmanUpdater(nx+nu, λ=λ, P0=P0)
-    updater  = GradientUpdater(α=λ)
+    α, λ, tui, P0 = 3, 1e-2, 20, 1.5e10
+    updater = KalmanUpdater(nx+nu, λ=λ)
+    # updater  = NewtonUpdater(α=λ)
     m        = QuadraticModel(nx+nu; updater=updater, actiondims=1:1)
     gridm        = Grid(domain, m, splitter, initial_split=2:5)
     Q            = Qfun(gridm, splitter); # Q is now our Q-function approximator
@@ -109,9 +108,9 @@ ho = Hyperopt.@hyperopt for i=100, sampler = RandomSampler(),
     policy = ϵGreedyPolicy(ϵ, decay_rate, Q);
     rh = Qlearning(Q, policy, num_episodes, α, plotting = false, target_update_interval=tui)
     sum(rh.values)
-end
+# end
 
-plot(ho, smooth=true)
+# plot(ho, smooth=true)
 
 # xp = map(volume, Leaves(gridm))
 # yp = map(innovation_var, Leaves(gridm))
@@ -137,16 +136,3 @@ plot(ho, smooth=true)
 # Q            = Qfun(gridm, splitter);
 #
 # @time Qlearning(Q,policy, num_episodes, α, plotting = false)
-
-
-k = 1
-for i in eachindex(x)
-    global k
-    for j in i:length(x)
-        global k
-        k += 1
-    end
-    k += 1
-end
-
-k
