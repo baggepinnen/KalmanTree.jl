@@ -95,15 +95,15 @@ ho = Hyperopt.@phyperopt for i=50, sampler = RandomSampler(),
     # P0  = exp10.(LinRange(0, 15, 200))
 
     @show i
-    # α, λ, tui = 1, 0.99, 20
+    # α, λ, tui = 1, 0.95, 20
     # α, λ, tui = 1, 0.5, 20
     # updater = KalmanUpdater(nx+nu, λ=λ)
     updater = RLSUpdater(nx+nu, λ=λ)
     # updater  = NewtonUpdater(α=λ)
     m        = QuadraticModel(nx+nu; updater=updater, actiondims=1:1)
-    gridm        = Grid(domain, m, splitter, initial_split=2)
+    gridm        = Grid(domain, m, splitter, initial_split=2:3)
     Q            = Qfun(gridm, splitter); # Q is now our Q-function approximator
-    num_episodes = 10
+    num_episodes = 30
     α            = 1 # Initial learning rate
     ϵ            = 0.8 # Initial chance of choosing random action
     decay_rate   = 0.9 # decay rate for learning rate and ϵ

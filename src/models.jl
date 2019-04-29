@@ -134,7 +134,10 @@ function argmax_u(m::QuadraticModel, x, domain)
 
 end
 argmax_u(g::LeafNode, x) = argmax_u(g.model, x, g.domain)
-argmax_u(g::AbstractNode, x) = argmax_u(walk_down(g,x,(0,)), x) # TODO: fix this [0]
+function argmax_u(g::AbstractNode, x)
+    n = walk_down_x(g, x)
+    argmax_u(n, x) 
+end
 
 
 function newton_ascent(Quu, RHS, domain)
