@@ -27,7 +27,6 @@ KalmanUpdater(n::Int; kwargs...) = KalmanUpdater(;P=100000Matrix(Eye(n2p(n))), k
 function update!(m::KalmanUpdater, w, ϕ, y)
     # TODO: this can be made more efficient
     P,λ,σ²  = m.P, m.λ, value(m.σ2)
-    @show sqrt(σ²)
     ϕᵀP  = ϕ'*P
     Pϕ   = P*ϕ
     ϕᵀPϕ = ϕᵀP*ϕ
@@ -91,7 +90,6 @@ function predict(m::QuadraticModel, args...)
     m.ϕ'm.w
 end
 
-argmax_u(g::AbstractNode, x) = argmax_u(g.model, x, g.domain)
 
 function Qmats(m::QuadraticModel,x)
     nu = length(m.actiondims)
@@ -116,13 +114,13 @@ function argmax_u(m::QuadraticModel, x, domain)
     actiondomain = domain[m.actiondims]
     Quu, Qux, qu = Qmats(m,x)
     RHS = (Qux*x + qu)
-    as = vec((Quu\(-RHS)) ./2) # Negated both Q and RHS to be able to check posdef
+    as = -(Quu-1e-8I)\RHS # Negated both Q and RHS to be able to check posdef
     posdef = isposdef(Quu)
     if as ∈ actiondomain && posdef
         return as
     elseif posdef # but argmax not in domain
-        lb = getindex.(actiondomain, 1)
-        ub = getindex.(actiondomain, 2)
+        lb = float.(getindex.(actiondomain, 1))
+        ub = float.(getindex.(actiondomain, 2))
         u0 = centroid(actiondomain)
         res = boxQP(Quu,RHS, lb, ub, u0;
                                     minGrad = 1e-10,
@@ -135,13 +133,15 @@ function argmax_u(m::QuadraticModel, x, domain)
     return newton_ascent(Quu, RHS, actiondomain)
 
 end
+argmax_u(g::LeafNode, x) = argmax_u(g.model, x, g.domain)
+argmax_u(g::AbstractNode, x) = argmax_u(walk_down(g,x,(0,)), x) # TODO: fix this [0]
 
 
 function newton_ascent(Quu, RHS, domain)
     u = centroid(domain) # start point
     α = 1maximum(volume(d) for d in domain)
     Quuf = cholesky(Positive, Quu)
-    grad(u) = -α*Quuf\(2Quu*u + RHS)
+    grad(u) = -α*(Quuf\(2Quu*u + RHS))
     g = grad(u)
     u .+= g # Take enormous gradient step
     project!(u, domain)

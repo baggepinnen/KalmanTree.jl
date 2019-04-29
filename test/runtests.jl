@@ -240,7 +240,6 @@ using KalmanTree: depthfirst, breadthfirst, allowed_dims
             model = QuadraticModel(nx+nu; updater=KalmanUpdater(nx+nu), actiondims=1:nu)
             splitter = InnovationSplitter(nu+1:nu+nx) |> VolumeWrapper |> VisitedWrapper
             g = Grid(domain, model, splitter)
-            # X,U,Y = [],[],[]
             for i = 1:10000
                 if i % 100 == 0
                     KalmanTree.find_and_apply_split(g, splitter)
@@ -249,9 +248,6 @@ using KalmanTree: depthfirst, breadthfirst, allowed_dims
                 x = 2 .*rand(nx) .-1
                 u = 2 .*rand(nu) .-1
                 y = f(x,u) + 0.1*(sum(x)+sum(u))*randn()
-                # push!(X,x)
-                # push!(U,u)
-                # push!(Y,y)
                 # yh = predict(g, x, u)
                 # @show i
                 # @show y-yh
@@ -295,16 +291,52 @@ using KalmanTree: depthfirst, breadthfirst, allowed_dims
 end
 ##
 
-# E = @benchmark begin
-# x,u = (X[rand(1:length(X))],U[rand(1:length(X))])
-# n = walk_down(g,x,u)
-# um = argmax_u(n, x)
-# argmax_u(n, x)
-# end
-# display(E)
-# plot(u->predict(n.model, x, u), -2,2, title="Q(a)", legend=false)
-# vline!([um])
-# vline!([n.domain[n.model.actiondims][]...], l=(:dash,:black))
-# pf = (u1,u2)->predict(n.model, x, [u1;u2])
-# surface(xu...,pf, title="Q(a)", legend=false)
-# scatter3d!(um[1:1],um[2:2], [pf(um...)], m=(10,:cyan))
+
+@testset "argmax_u" begin
+
+
+    f = (x,u) -> sin(3sum(x)) + sum(-(u.-x).^2)
+    function argmaxtest(nx,nu)
+        domain = fill((-1.,1.), nx+nu)
+        model = QuadraticModel(nx+nu; updater=KalmanUpdater(nx+nu), actiondims=1:nu)
+        splitter = InnovationSplitter(nu+1:nu+nx) |> VolumeWrapper |> VisitedWrapper
+        g = Grid(domain, model, splitter)
+        X,U,Y = [],[],[]
+        for i = 1:10000
+            if i % 100 == 0
+                KalmanTree.find_and_apply_split(g, splitter)
+            end
+            x = 2 .*rand(nx) .-1
+            u = 2 .*rand(nu) .-1
+            y = f(x,u) + 0.1*(sum(x)+sum(u))*randn()
+            push!(X,x)
+            push!(U,u)
+            push!(Y,y)
+            KalmanTree.update!(g,x,u,y)
+
+        end
+        X,U,Y,g
+    end
+    X,U,Y,g = argmaxtest(1,1)
+    for i = 1:100
+        # E = @benchmark begin
+        x,u = (X[rand(1:length(X))],U[rand(1:length(X))])
+        n = walk_down(g,x,u)
+        um = KalmanTree.argmax_u(n, x)
+        # end
+        # display(E)
+
+        # plot(u->KalmanTree.predict(n.model, x, u), -2,2, title="Q(a)", legend=false)
+        # vline!([um])
+        # vline!([n.domain[n.model.actiondims][]...], l=(:dash,:black))
+
+        @test um[] ∈ (n.domain[n.model.actiondims][]...,)
+        # test that a small ϵ makes the value worse, unless we're at the boundary of the domain
+        @test KalmanTree.predict(n.model, x, um[]) > KalmanTree.predict(n.model, x, um[]+1e-4) || um[] == n.domain[n.model.actiondims][][2]
+        @test KalmanTree.predict(n.model, x, um[]) > KalmanTree.predict(n.model, x, um[]-1e-4) || um[] == n.domain[n.model.actiondims][][1]
+    end
+
+    # pf = (u1,u2)->predict(n.model, x, [u1;u2])
+    # surface(xu...,pf, title="Q(a)", legend=false)
+    # scatter3d!(um[1:1],um[2:2], [pf(um...)], m=(10,:cyan))
+end
