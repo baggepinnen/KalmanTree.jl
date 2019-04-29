@@ -18,7 +18,7 @@ end
 
 @with_kw struct KalmanUpdater{TP,Tl,Tσ<:Variance} <: AbstractUpdater
     P::TP
-    λ::Tl = 1.
+    λ::Tl = 0.001
     σ2::Tσ = Variance(weight=McclainWeight(0.01)) # TODO: it seems OnlineStats are using weight as opposed to forgetting factor, does w = 1-λ hold?
 end
 
@@ -27,6 +27,7 @@ KalmanUpdater(n::Int; kwargs...) = KalmanUpdater(;P=100000Matrix(Eye(n2p(n))), k
 function update!(m::KalmanUpdater, w, ϕ, y)
     # TODO: this can be made more efficient
     P,λ,σ²  = m.P, m.λ, value(m.σ2)
+    @show sqrt(σ²)
     ϕᵀP  = ϕ'*P
     Pϕ   = P*ϕ
     ϕᵀPϕ = ϕᵀP*ϕ
@@ -203,8 +204,7 @@ function update!(m::GradientUpdater, w, ϕ, y)
     w .+= ϕ .* (m.α*e)
 end
 
-Base.:∈(x::AbstractArray, dom::Vector{<:Tuple}) = all(x ∈ d for (x,d) in zip(x,dom))
-Base.:∈(x::Number, dom::Tuple{<:Number,<:Number}) = dom[1] ≤ x ≤ dom[2]
+
 
 Statistics.cov(u::AbstractUpdater) = u.P
 Statistics.cov(m::AbstractModel) = cov(m.updater)

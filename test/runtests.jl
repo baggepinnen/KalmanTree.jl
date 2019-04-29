@@ -87,6 +87,9 @@ using KalmanTree: depthfirst, breadthfirst, allowed_dims
         foreach(x,u,y) do x,u,y
             update!(m,x,u,y)
         end
+        foreach(x,u,y) do x,u,y
+            update!(m,x,u,y)
+        end
 
         @test all(zip(x,u,y)) do (x,u,y)
             abs(y - predict(m,x,u)) < 0.0001
@@ -97,9 +100,9 @@ using KalmanTree: depthfirst, breadthfirst, allowed_dims
         Quu,Qux, qu = KalmanTree.Qmats(m,x[1])
 
         @test isposdef(-Quu)
-        @test sum(abs, -Quu \ Q[1:3,1:3] - I) < 5
-        @test sum(abs, -2qu - q[1:3]) < 1e-5
-        @test sum(abs, -Qux - Q[1:3,4:5]) < 1.3e-5
+        @test sum(abs, -Quu \ Q[1:3,1:3] - I) < 3e-6
+        @test sum(abs, -2qu - q[1:3]) < 3e-6
+        @test sum(abs, -Qux - Q[1:3,4:5]) < 3e-6
         @test abs(m.w[end] - c) < 1e-5
 
 
@@ -128,6 +131,103 @@ using KalmanTree: depthfirst, breadthfirst, allowed_dims
         @test mean(zip(x,u,y)) do (x,u,y)
             abs2(y - predict(m,x,u))
         end  < 1e-6
+
+
+        @testset "innovation variance KalmanUpdater" begin
+            import Base.Iterators: cycle, take
+            σ = 0.1
+            N = 2000
+            x = [randn(2) for i = 1:N]
+            u = [randn(3) for i = 1:N]
+            y = map(fq,x,u) .+ σ .* randn.()
+
+            m = QuadraticModel(5, updater=KalmanUpdater(5, λ=0.001), actiondims=1:3)
+            m.updater.σ2.weight.α = 0.01
+            vars = []
+            foreach(x,u,y) do x,u,y
+                update!(m,x,u,y)
+                push!(vars, innovation_var(m))
+            end
+            # plot(sqrt.(vars))
+            @test sqrt(innovation_var(m)) > 0.9σ
+
+            @test @show(mean(zip(x,u,y)) do (x,u,y)
+                abs2(y - predict(m,x,u))
+            end |> sqrt) < 1.1σ
+
+            foreach(take(cycle(zip(x,u,y)),10N)) do (x,u,y)
+                update!(m,x,u,y)
+            end
+            # @test sqrt(innovation_var(m)) < σ # Expect some overfitting
+            @test  @show(mean(zip(x,u,y)) do (x,u,y)
+                abs2(y - predict(m,x,u))
+            end |> sqrt) < 1.1σ
+        end
+
+        @testset "innovation variance RLSUpdater" begin
+            import Base.Iterators: cycle, take
+            σ = 0.1
+            N = 2000
+            x = [randn(2) for i = 1:N]
+            u = [randn(3) for i = 1:N]
+            y = map(fq,x,u) .+ σ .* randn.()
+
+            m = QuadraticModel(5, updater=RLSUpdater(5, λ=0.999), actiondims=1:3)
+
+            vars = []
+            foreach(x,u,y) do x,u,y
+                update!(m,x,u,y)
+                push!(vars, innovation_var(m))
+            end
+            # plot(sqrt.(vars))
+
+            @test sqrt(innovation_var(m)) > 0.9σ
+
+            @test @show(mean(zip(x,u,y)) do (x,u,y)
+                abs2(y - predict(m,x,u))
+            end |> sqrt) < 1.1σ
+
+            foreach(take(cycle(zip(x,u,y)),10N)) do (x,u,y)
+                update!(m,x,u,y)
+            end
+            # @test sqrt(innovation_var(m)) < σ # Expect some overfitting
+            @test  @show(mean(zip(x,u,y)) do (x,u,y)
+                abs2(y - predict(m,x,u))
+            end |> sqrt) < 1.1σ
+        end
+
+
+        @testset "innovation variance NewtonUpdater" begin
+            import Base.Iterators: cycle, take
+            σ = 0.1
+            N = 2000
+            x = [randn(2) for i = 1:N]
+            u = [randn(3) for i = 1:N]
+            y = map(fq,x,u) .+ σ .* randn.()
+
+            m = QuadraticModel(5, updater=NewtonUpdater(0.1), actiondims=1:3)
+
+            vars = []
+            foreach(x,u,y) do x,u,y
+                update!(m,x,u,y)
+                push!(vars, innovation_var(m))
+            end
+            # plot(sqrt.(vars))
+
+            @test sqrt(innovation_var(m)) > 0.9σ
+
+            @test @show(mean(zip(x,u,y)) do (x,u,y)
+                abs2(y - predict(m,x,u))
+            end |> sqrt) < 1.4σ
+
+            foreach(take(cycle(zip(x,u,y)),10N)) do (x,u,y)
+                update!(m,x,u,y)
+            end
+            # @test sqrt(innovation_var(m)) < σ # Expect some overfitting
+            @test  @show(mean(zip(x,u,y)) do (x,u,y)
+                abs2(y - predict(m,x,u))
+            end |> sqrt) < 1.15σ
+        end
 
     end
 
