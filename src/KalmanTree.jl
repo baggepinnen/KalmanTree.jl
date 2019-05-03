@@ -28,7 +28,6 @@ end
 #= Notes:
 Should splitting along action dimensions be allowed? Then how does one find argmaxₐ(Q)? since this max can be outside the domain of the model.
 If splts along action dimensions are kept at the bottom of the tree, one could operate on a subtree when finding argmaxₐ(Q). Each argmax is a box-constrained QP where the domain in a-dimensions determine the bounds. With this strategy, argmaxₐ must be carried out as many times as there are leaves in the subtree corresponding to the s-coordinate.
-First, the unconstraind argmax can be calculated for each cell. If the highest is inside its bounds, no box-constrained QP has to be solved
 Unfortunately, each split of the state-space then doubles the "action subtree" instead of increasing the node count by 1.
 
 A KalmanUpdater is not suitable to indicate which direction in parameter space seem to be nonlinear, or fit the current model poorly. The parameter covariance matrix is completely determined by input data, no influence of fit/ output data. Estimate innovation variance as (s-c)'Q(s-c) + q where c is the cell centroid, s is the state and q is the variance at the centroid. How to keep tihs Q posdef? BFGS updates? Kalmanupdater with cholesky Q = LL'?

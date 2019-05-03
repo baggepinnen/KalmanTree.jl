@@ -47,10 +47,33 @@ isleaf(g::RootNode) = false
 # isroot(g::GridNode) = false
 # isroot(g::RootNode) = true
 
+@inline function xu_val(g,x,u,dim=g.dim)
+    if dim > length(u)
+        return x[dim - length(u)]
+    else
+        return u[dim]
+    end
+end
+
+@inline function active_node(g::AbstractNode, xu)
+    xu[g.dim] > g.split ? g.right : g.left
+end
+@inline function active_node(g::AbstractNode, x, u)
+    xu_val(g,x,u) > g.split ? g.right : g.left
+end
+@inline function active_node_x(g::AbstractNode, x)
+    x[g.dim-length(g.domain)+length(x)] > g.split ? g.right : g.left
+end
+
 walk_down(g::LeafNode, args...) = g
+walk_down_x(g::LeafNode, args...) = g
 
 function walk_down(g, args...)
     walk_down(active_node(g, args...), args...)
+end
+
+function walk_down_x(g, args...)
+    walk_down(active_node_x(g, args...), args...)
 end
 
 walk_up(g::RootNode, d) = g,0
@@ -105,21 +128,6 @@ function Grid(domain::AbstractVector{<:Tuple}, model, splitter; initial_split=al
         end
     end
     seed
-end
-
-function xu_val(g,x,u,dim=g.dim)
-    if dim > length(u)
-        return x[dim - length(u)]
-    else
-        return u[dim]
-    end
-end
-
-function active_node(g::AbstractNode, x)
-    x[g.dim] > g.split ? g.right : g.left
-end
-function active_node(g::AbstractNode, x, u)
-    xu_val(g,x,u) > g.split ? g.right : g.left
 end
 
 function predict(g::AbstractNode, args...)

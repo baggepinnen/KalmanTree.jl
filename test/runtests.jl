@@ -396,7 +396,54 @@ end
         @test KalmanTree.predict(n.model, x, um[]) > KalmanTree.predict(n.model, x, um[]-1e-4) || um[] == n.domain[n.model.actiondims][][1]
     end
 
-    # pf = (u1,u2)->predict(n.model, x, [u1;u2])
-    # surface(xu...,pf, title="Q(a)", legend=false)
-    # scatter3d!(um[1:1],um[2:2], [pf(um...)], m=(10,:cyan))
+    X,U,Y,g = argmaxtest(2,2)
+    for i = 1:100
+        x,u = (X[rand(1:length(X))],U[rand(1:length(X))])
+        n = walk_down(g,x,u)
+        um = KalmanTree.argmax_u(n, x)
+        udom = n.domain[n.model.actiondims]
+        @test um ∈ udom
+        # test that a small ϵ makes the value worse, unless we're at the boundary of the domain
+        utest = KalmanTree.project!(um .+ 1e-4 .* randn.(), udom)
+        @test utest ∈ udom
+        Qatest = KalmanTree.predict(n.model, x, utest)
+        @test KalmanTree.predict(n.model, x, um) >= Qatest - 0.001abs(Qatest)
+    end
+
+    # Mess it up and have wrong curvature
+    f = (x,u) -> sin(3sum(x)) + sum((u.-x).^2)
+    X,U,Y,g = argmaxtest(2,2)
+    for i = 1:100
+        x,u = (X[rand(1:length(X))],U[rand(1:length(X))])
+        n = walk_down(g,x,u)
+        um = KalmanTree.argmax_u(n, x)
+        udom = n.domain[n.model.actiondims]
+        @test um ∈ udom
+        # test that a small ϵ makes the value worse, unless we're at the boundary of the domain
+        utest = KalmanTree.project!(um .+ 1e-4 .* randn.(), udom)
+        @test utest ∈ udom
+        Qatest = KalmanTree.predict(n.model, x, utest)
+        @test KalmanTree.predict(n.model, x, um) >= Qatest - 0.001abs(Qatest)
+
+    end
+
 end
+
+
+##
+
+# x,u = (X[rand(1:length(X))],U[rand(1:length(X))])
+# n = walk_down(g,x,u)
+# um = KalmanTree.argmax_u(n, x)
+# xu = LinRange(-1,1,30),LinRange(-1,1,30)
+# pf = (u1,u2)->KalmanTree.predict(n.model, x, [u1;u2])
+# surface(xu...,pf, title="Q(a)", legend=false, alpha=0.2)
+# scatter3d!(um[1:1],um[2:2], [pf(um...)], m=(20,:cyan))
+
+##
+
+# x,u = (X[rand(1:length(X))],U[rand(1:length(X))])
+# pf = (s1,s2)->KalmanTree.predict(g, [s1,s2], u)
+# surface(xu...,pf, title="Q(a)", legend=false, alpha=0.2)
+
+##
