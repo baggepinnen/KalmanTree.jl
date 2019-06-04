@@ -73,7 +73,7 @@ function walk_down(g, args...)
 end
 
 function walk_down_x(g, args...)
-    walk_down(active_node_x(g, args...), args...)
+    walk_down_x(active_node_x(g, args...), args...)
 end
 
 walk_up(g::RootNode, d) = g,0

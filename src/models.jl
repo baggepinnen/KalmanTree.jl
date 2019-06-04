@@ -11,6 +11,7 @@ function update!(m::RLSUpdater, w, ϕ, y)
     P,λ = m.P, m.λ
     ϕᵀP = ϕ'*P
     P .= (P .- (P*ϕ*ϕᵀP) ./(λ + ϕᵀP*ϕ))./λ
+    P .= (P .+ P') .* 0.5
     e = y - ϕ'w
     fit!(m.σ2, e)
     w .+= P*ϕ .* e
@@ -68,8 +69,8 @@ end
 function feature!(m::QuadraticModel, x)
     ϕ = m.ϕ
     k = 1
-    for i in eachindex(x)
-        for j in i:length(x)
+    @inbounds for i in eachindex(x)
+        @inbounds for j in i:length(x)
             ϕ[k] = x[i]*x[j]
             k += 1
         end
@@ -136,8 +137,13 @@ end
 argmax_u(g::LeafNode, x) = argmax_u(g.model, x, g.domain)
 function argmax_u(g::AbstractNode, x)
     n = walk_down_x(g, x)
-    argmax_u(n, x) 
+    argmax_u(n, x)
 end
+
+# function argmax_u(g::AbstractNode, x)
+#     n = walk_down(g, x, (0,))
+#     argmax_u(n, x)
+# end
 
 
 function newton_ascent(Quu, RHS, domain)

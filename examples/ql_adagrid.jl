@@ -87,26 +87,26 @@ addprocs(4)
 end # @everywhere
 #
 
-ho = Hyperopt.@phyperopt for i=50, sampler = RandomSampler(),
+ho = Hyperopt.@phyperopt for i=12, sampler = RandomSampler(),
     # α   = LinRange(0.5,3,200),
-    λ   = reverse(1 .-exp10.(LinRange(-5,-1,200))),
-    # λ   = exp10.(LinRange(-2,0,200)),
+    # λ   = reverse(1 .-exp10.(LinRange(-3,-0.5,200))),
+    λ   = exp10.(LinRange(-3,2,200)),
     tui = round.(Int, exp10.(LinRange(1, 1.5, 200)))
     # P0  = exp10.(LinRange(0, 15, 200))
 
     @show i
     # α, λ, tui = 1, 0.95, 20
-    # α, λ, tui = 1, 0.5, 20
-    # updater = KalmanUpdater(nx+nu, λ=λ)
-    updater = RLSUpdater(nx+nu, λ=λ)
-    # updater  = NewtonUpdater(α=λ)
-    m        = QuadraticModel(nx+nu; updater=updater, actiondims=1:1)
+    # α, λ, tui = 1, 1e-3, 20
+    updater = KalmanUpdater(nx+nu, λ=λ)
+    # updater      = RLSUpdater(nx+nu, λ=λ); (updater.P .*= 0.001)
+    # updater    = NewtonUpdater(α                        =λ)
+    m            = QuadraticModel(nx+nu; updater=updater, actiondims=1:1)
     gridm        = Grid(domain, m, splitter, initial_split=2:3)
     Q            = Qfun(gridm, splitter); # Q is now our Q-function approximator
-    num_episodes = 30
-    α            = 1 # Initial learning rate
+    num_episodes = 150
+    α            = 1   # Initial learning rate
     ϵ            = 0.8 # Initial chance of choosing random action
-    decay_rate   = 0.9 # decay rate for learning rate and ϵ
+    decay_rate   = 0.99 # decay rate for learning rate and ϵ
     @info "Final ϵ: ", ϵ*decay_rate^num_episodes
     policy = ϵGreedyPolicy(ϵ, decay_rate, Q);
     rh = Qlearning(Q, policy, num_episodes, plotting = false, target_update_interval=tui)
